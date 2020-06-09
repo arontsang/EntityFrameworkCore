@@ -1,7 +1,9 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Internal;
@@ -48,19 +50,34 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var modelBuilder = CreateModelBuilder();
             var entityTypeBuilder = modelBuilder.Entity<A>();
 
-            Assert.False(entityTypeBuilder.Property(e => e.Name).Metadata.IsNullable);
+            Assert.False(entityTypeBuilder.Property(e => e.NonNullable).Metadata.IsNullable);
         }
 
         [ConditionalTheory]
-        [InlineData(nameof(A.NullAwareNonNullable), false)]
-        [InlineData(nameof(A.NullAwareNullable), true)]
-        [InlineData(nameof(A.NullObliviousNonNullable), true)]
-        [InlineData(nameof(A.NullObliviousNullable), true)]
-        [InlineData(nameof(A.RequiredAndNullable), false)]
-        public void Reference_nullability_sets_is_nullable_correctly(string propertyName, bool expectedNullable)
+        [InlineData(typeof(A), nameof(A.NonNullable), false)]
+        [InlineData(typeof(A), nameof(A.Nullable), true)]
+        [InlineData(typeof(A), nameof(A.NonNullablePropertyMaybeNull), true)]
+        [InlineData(typeof(A), nameof(A.NonNullablePropertyAllowNull), false)]
+        [InlineData(typeof(A), nameof(A.NullablePropertyNotNull), true)]
+        [InlineData(typeof(A), nameof(A.NullablePropertyDisallowNull), true)]
+        [InlineData(typeof(A), nameof(A.NonNullableFieldMaybeNull), true)]
+        [InlineData(typeof(A), nameof(A.NonNullableFieldAllowNull), false)]
+        [InlineData(typeof(A), nameof(A.NullableFieldNotNull), true)]
+        [InlineData(typeof(A), nameof(A.NullableFieldDisallowNull), true)]
+        [InlineData(typeof(A), nameof(A.RequiredAndNullable), false)]
+        [InlineData(typeof(A), nameof(A.NullObliviousNonNullable), true)]
+        [InlineData(typeof(A), nameof(A.NullObliviousNullable), true)]
+        [InlineData(typeof(B), nameof(B.NonNullableValueType), false)]
+        [InlineData(typeof(B), nameof(B.NullableValueType), true)]
+        [InlineData(typeof(B), nameof(B.NonNullableRefType), false)]
+        [InlineData(typeof(B), nameof(B.NullableRefType), true)]
+        [InlineData(typeof(DerivedClass), nameof(DerivedClass.NonNullable), false)]
+        [InlineData(typeof(DerivedClass), nameof(DerivedClass.Nullable), true)]
+        [InlineData(typeof(BaseClass), nameof(DerivedClass.Nullable), true)]
+        public void Reference_nullability_sets_is_nullable_correctly(Type type, string propertyName, bool expectedNullable)
         {
             var modelBuilder = CreateModelBuilder();
-            var entityTypeBuilder = modelBuilder.Entity<A>();
+            var entityTypeBuilder = modelBuilder.Entity(type);
 
             Assert.Equal(expectedNullable, entityTypeBuilder.Property(propertyName).Metadata.IsNullable);
         }
@@ -93,10 +110,32 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             public int Id { get; set; }
 
 #nullable enable
-            public string Name { get; set; } = "";
+            public string NonNullable { get; } = "";
+            public string? Nullable { get; set; }
 
-            public string NullAwareNonNullable { get; set; } = "";
-            public string? NullAwareNullable { get; set; }
+            [MaybeNull]
+            public string NonNullablePropertyMaybeNull { get; } = "";
+
+            [AllowNull]
+            public string NonNullablePropertyAllowNull { get; } = "";
+
+            [NotNull]
+            public string? NullablePropertyNotNull { get; } = "";
+
+            [DisallowNull]
+            public string? NullablePropertyDisallowNull { get; } = "";
+
+            [MaybeNull]
+            public string NonNullableFieldMaybeNull = "";
+
+            [AllowNull]
+            public string NonNullableFieldAllowNull = "";
+
+            [NotNull]
+            public string? NullableFieldNotNull = "";
+
+            [DisallowNull]
+            public string? NullableFieldDisallowNull = "";
 
             [Required]
             public string? RequiredAndNullable { get; set; }
@@ -107,6 +146,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             public string? NullObliviousNullable { get; set; }
 #pragma warning restore CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' context.
         }
+
+#nullable enable
+        public class B
+        {
+            [Key]
+            public Guid NonNullableValueType { get; set; }
+
+            public Guid? NullableValueType { get; set; }
+            public string NonNullableRefType { get; set; } = "";
+            public string? NullableRefType { get; set; }
+        }
+
+        public class DerivedClass : BaseClass
+        {
+            public string NonNullable { get; set; } = default!;
+        }
+
+        public class BaseClass
+        {
+            public string? Nullable { get; set; }
+        }
+#nullable disable
 
         private static ModelBuilder CreateModelBuilder() => InMemoryTestHelpers.Instance.CreateConventionBuilder();
     }

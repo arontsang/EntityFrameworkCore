@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -10,7 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using JetBrains.Annotations;
-using Microsoft.Data.SqlClient; // Note: Hard reference to SqlClient here.
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore.SqlServer.Storage.ValueConversion.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -44,7 +44,7 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         [UsedImplicitly]
-        public SqlServerGeometryTypeMapping(NtsGeometryServices geometryServices, string storeType)
+        public SqlServerGeometryTypeMapping([NotNull] NtsGeometryServices geometryServices, [NotNull] string storeType)
             : base(
                 new GeometryValueConverter<TGeometry>(
                     CreateReader(geometryServices, IsGeography(storeType)),
@@ -60,7 +60,7 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         /// </summary>
         protected SqlServerGeometryTypeMapping(
             RelationalTypeMappingParameters parameters,
-            ValueConverter<TGeometry, SqlBytes> converter)
+            [CanBeNull] ValueConverter<TGeometry, SqlBytes> converter)
             : base(parameters, converter)
         {
             _isGeography = IsGeography(StoreType);
@@ -169,16 +169,10 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         }
 
         private static SqlServerBytesReader CreateReader(NtsGeometryServices services, bool isGeography)
-            => new SqlServerBytesReader(services)
-            {
-                IsGeography = isGeography
-            };
+            => new SqlServerBytesReader(services) { IsGeography = isGeography };
 
         private static SqlServerBytesWriter CreateWriter(bool isGeography)
-            => new SqlServerBytesWriter
-            {
-                IsGeography = isGeography
-            };
+            => new SqlServerBytesWriter { IsGeography = isGeography };
 
         private static bool IsGeography(string storeType)
             => string.Equals(storeType, "geography", StringComparison.OrdinalIgnoreCase);

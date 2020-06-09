@@ -8,7 +8,7 @@ using JetBrains.Annotations;
 namespace Microsoft.EntityFrameworkCore.Storage.ValueConversion
 {
     /// <summary>
-    ///     Converts <c>TModel</c> to and from <c>TProvider</c> using simple casts from one type
+    ///     Converts <typeparamref name="TModel"/> to and from <typeparamref name="TProvider"/> using simple casts from one type
     ///     to the other.
     /// </summary>
     public class CastingConverter<TModel, TProvider> : ValueConverter<TModel, TProvider>
@@ -53,7 +53,8 @@ namespace Microsoft.EntityFrameworkCore.Storage.ValueConversion
         ///     A <see cref="ValueConverterInfo" /> for the default use of this converter.
         /// </summary>
         public static ValueConverterInfo DefaultInfo { get; }
-            = new ValueConverterInfo(typeof(TModel), typeof(TProvider), i => new CastingConverter<TModel, TProvider>(i.MappingHints), _defaultHints);
+            = new ValueConverterInfo(
+                typeof(TModel), typeof(TProvider), i => new CastingConverter<TModel, TProvider>(i.MappingHints), _defaultHints);
 
         private static Expression<Func<TIn, TOut>> Convert<TIn, TOut>()
         {

@@ -47,12 +47,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Blog.BlogDetails));
             Assert.Contains(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(BlogDetails.Blog));
 
-            RunConvention(principalEntityTypeBuilder);
+            RunEntityTypeConventions(principalEntityTypeBuilder);
 
             Assert.DoesNotContain(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Blog.BlogDetails));
             Assert.DoesNotContain(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(BlogDetails.Blog));
 
-            RunConvention(dependentEntityTypeBuilder);
+            RunEntityTypeConventions(dependentEntityTypeBuilder);
 
             Assert.DoesNotContain(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Blog.BlogDetails));
             Assert.Contains(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(BlogDetails.Blog));
@@ -73,7 +73,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Blog.BlogDetails));
             Assert.Contains(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(BlogDetails.Blog));
 
-            RunConvention(principalEntityTypeBuilder);
+            RunEntityTypeConventions(principalEntityTypeBuilder);
 
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Blog.BlogDetails));
             Assert.Contains(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(BlogDetails.Blog));
@@ -112,7 +112,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 
             Assert.False(relationshipBuilder.Metadata.IsRequired);
 
-            RunConvention(relationshipBuilder, navigation);
+            RunRequiredNavigationAttributeConvention(relationshipBuilder, navigation);
 
             Assert.True(relationshipBuilder.Metadata.IsRequired);
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Blog.Posts));
@@ -137,7 +137,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 
             Assert.False(relationshipBuilder.Metadata.IsRequired);
 
-            RunConvention(relationshipBuilder, navigation);
+            RunRequiredNavigationAttributeConvention(relationshipBuilder, navigation);
 
             Assert.False(relationshipBuilder.Metadata.IsRequired);
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Blog.Posts));
@@ -161,11 +161,15 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 
             Assert.False(relationshipBuilder.Metadata.IsRequired);
 
-            RunConvention(relationshipBuilder, navigation);
+            RunRequiredNavigationAttributeConvention(relationshipBuilder, navigation);
 
             Assert.False(relationshipBuilder.Metadata.IsRequired);
 
-            Assert.Empty(ListLoggerFactory.Log);
+            var logEntry = ListLoggerFactory.Log.Single();
+            Assert.Equal(LogLevel.Debug, logEntry.Level);
+            Assert.Equal(
+                CoreResources.LogRequiredAttributeOnCollection(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
+                    nameof(Principal), nameof(Principal.Dependents)), logEntry.Message);
         }
 
         [ConditionalFact]
@@ -187,9 +191,15 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 
             Assert.False(relationshipBuilder.Metadata.IsRequired);
 
-            RunConvention(relationshipBuilder, navigation);
+            RunRequiredNavigationAttributeConvention(relationshipBuilder, navigation);
 
             Assert.False(relationshipBuilder.Metadata.IsRequired);
+
+            var logEntry = ListLoggerFactory.Log.Single();
+            Assert.Equal(LogLevel.Debug, logEntry.Level);
+            Assert.Equal(
+                CoreResources.LogRequiredAttributeOnDependent(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
+                    nameof(Dependent), nameof(Dependent.Principal)), logEntry.Message);
         }
 
         [ConditionalFact]
@@ -210,7 +220,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 
             var navigation = principalEntityTypeBuilder.Metadata.FindNavigation(nameof(Principal.Dependent));
 
-            RunConvention(relationshipBuilder, navigation);
+            RunRequiredNavigationAttributeConvention(relationshipBuilder, navigation);
 
             var newForeignKey = principalEntityTypeBuilder.Metadata.GetForeignKeys().Single();
             Assert.Equal(nameof(Principal.Dependent), newForeignKey.DependentToPrincipal.Name);
@@ -220,7 +230,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var logEntry = ListLoggerFactory.Log.Single();
             Assert.Equal(LogLevel.Debug, logEntry.Level);
             Assert.Equal(
-                CoreResources.LogRequiredAttributeOnDependent(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
+                CoreResources.LogRequiredAttributeInverted(new TestLogger<TestLoggingDefinitions>()).GenerateMessage(
                     nameof(Principal.Dependent), nameof(Principal)), logEntry.Message);
         }
 
@@ -275,7 +285,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Assert.DoesNotContain(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependent));
             Assert.Contains(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Dependent.Principal));
 
-            RunConvention(dependentEntityTypeBuilder);
+            RunEntityTypeConventions(dependentEntityTypeBuilder);
 
             Assert.DoesNotContain(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependents));
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependent));
@@ -301,7 +311,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Assert.DoesNotContain(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependent));
             Assert.Contains(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Dependent.Principal));
 
-            RunConvention(dependentEntityTypeBuilder);
+            RunEntityTypeConventions(dependentEntityTypeBuilder);
 
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependents));
             Assert.DoesNotContain(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependent));
@@ -334,9 +344,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 nav => nav.Name == nameof(AmbiguousDependent.AnotherAmbiguousPrincipal));
 
             var convention = new InversePropertyAttributeConvention(CreateDependencies(CreateLogger()));
-            convention.ProcessEntityTypeAdded(dependentEntityTypeBuilder,
+            convention.ProcessEntityTypeAdded(
+                dependentEntityTypeBuilder,
                 new ConventionContext<IConventionEntityTypeBuilder>(
-                dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
+                    dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
 
             Assert.DoesNotContain(
                 principalEntityTypeBuilder.Metadata.GetNavigations(),
@@ -378,9 +389,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Assert.Contains(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Dependent.Principal));
 
             var convention = new InversePropertyAttributeConvention(CreateDependencies(CreateLogger()));
-            convention.ProcessEntityTypeAdded(dependentEntityTypeBuilder,
+            convention.ProcessEntityTypeAdded(
+                dependentEntityTypeBuilder,
                 new ConventionContext<IConventionEntityTypeBuilder>(
-                dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
+                    dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
 
             var logEntry = ListLoggerFactory.Log.Single();
             Assert.Equal(LogLevel.Warning, logEntry.Level);
@@ -411,17 +423,19 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Assert.DoesNotContain(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Dependent.Principal));
 
             var convention = new InversePropertyAttributeConvention(CreateDependencies(CreateLogger()));
-            convention.ProcessEntityTypeAdded(dependentEntityTypeBuilder,
+            convention.ProcessEntityTypeAdded(
+                dependentEntityTypeBuilder,
                 new ConventionContext<IConventionEntityTypeBuilder>(
-                dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
+                    dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
 
             Assert.Contains(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependents));
             Assert.DoesNotContain(principalEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Principal.Dependent));
             Assert.DoesNotContain(dependentEntityTypeBuilder.Metadata.GetNavigations(), nav => nav.Name == nameof(Dependent.Principal));
 
-            convention.ProcessModelFinalized(dependentEntityTypeBuilder.ModelBuilder,
+            convention.ProcessModelFinalizing(
+                dependentEntityTypeBuilder.ModelBuilder,
                 new ConventionContext<IConventionModelBuilder>(
-                dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
+                    dependentEntityTypeBuilder.Metadata.Model.ConventionDispatcher));
 
             var logEntry = ListLoggerFactory.Log.Single();
             Assert.Equal(LogLevel.Warning, logEntry.Level);
@@ -440,7 +454,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 CoreStrings.SelfReferencingNavigationWithInverseProperty(
                     "AnotherEntity", nameof(SelfReferencingEntity), "AnotherEntity", nameof(SelfReferencingEntity)),
                 Assert.Throws<InvalidOperationException>(
-                    () => RunConvention(entityTypeBuilder)).Message);
+                    () => RunEntityTypeConventions(entityTypeBuilder)).Message);
         }
 
         [ConditionalFact]
@@ -452,7 +466,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 CoreStrings.InvalidNavigationWithInverseProperty(
                     "Principal", nameof(NonExistentNavigation), "WrongNavigation", nameof(Principal)),
                 Assert.Throws<InvalidOperationException>(
-                    () => RunConvention(entityTypeBuilder)).Message);
+                    () => RunEntityTypeConventions(entityTypeBuilder)).Message);
         }
 
         [ConditionalFact]
@@ -463,7 +477,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Assert.Equal(
                 CoreStrings.InvalidNavigationWithInverseProperty("Principal", nameof(WrongNavigationType), "Dependent", nameof(Principal)),
                 Assert.Throws<InvalidOperationException>(
-                    () => RunConvention(entityTypeBuilder)).Message);
+                    () => RunEntityTypeConventions(entityTypeBuilder)).Message);
         }
 
         [ConditionalFact]
@@ -475,15 +489,17 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 CoreStrings.InversePropertyMismatch(
                     "Principal", nameof(MismatchedInverseProperty), "MismatchedInverseProperty", nameof(Principal)),
                 Assert.Throws<InvalidOperationException>(
-                    () => RunConvention(entityTypeBuilder)).Message);
+                    () => RunEntityTypeConventions(entityTypeBuilder)).Message);
         }
 
         #endregion
 
         #region ForeignKeyAttribute
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_overrides_configuration_from_convention_source()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_overrides_configuration_from_convention_source(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Dependent>();
             var principalEntityTypeBuilder =
@@ -496,21 +512,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            Dependent.PrincipalIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { Dependent.PrincipalIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Convention);
 
             Assert.Equal("PrincipalId", relationshipBuilder.Metadata.Properties.First().Name);
 
-            RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal("PrincipalFk", relationshipBuilder.Metadata.Properties.First().Name);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_does_not_override_configuration_from_explicit_source()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_does_not_override_configuration_from_explicit_source(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Dependent>();
             var principalEntityTypeBuilder =
@@ -523,21 +546,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            Dependent.PrincipalIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { Dependent.PrincipalIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Explicit);
 
             Assert.Equal("PrincipalId", relationshipBuilder.Metadata.Properties.First().Name);
 
-            RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal("PrincipalId", relationshipBuilder.Metadata.Properties.First().Name);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_sets_foreign_key_properties_when_applied_on_dependent_to_principal_navigation()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_sets_foreign_key_properties_when_applied_on_dependent_to_principal_navigation(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Dependent>();
             var principalEntityTypeBuilder =
@@ -550,21 +580,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            Dependent.PrincipalIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { Dependent.PrincipalIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Convention);
 
             Assert.Equal("PrincipalId", relationshipBuilder.Metadata.Properties.First().Name);
 
-            RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal("PrincipalFk", relationshipBuilder.Metadata.Properties.First().Name);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_sets_foreign_key_properties_when_applied_on_principal_to_dependent_navigation()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_sets_foreign_key_properties_when_applied_on_principal_to_dependent_navigation(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Dependent>();
             var principalEntityTypeBuilder =
@@ -577,21 +614,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            Dependent.PrincipalIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { Dependent.PrincipalIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Convention);
 
             Assert.Equal("PrincipalId", relationshipBuilder.Metadata.Properties.First().Name);
 
-            RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.PrincipalToDependent;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal("PrincipalAnotherFk", relationshipBuilder.Metadata.Properties.First().Name);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_sets_foreign_key_properties_when_applied_on_property_on_dependent_side()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_sets_foreign_key_properties_when_applied_on_property_on_dependent_side(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Dependent>();
             var principalEntityTypeBuilder =
@@ -604,21 +648,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            Dependent.PrincipalIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { Dependent.PrincipalIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Convention);
 
             Assert.Equal("PrincipalId", relationshipBuilder.Metadata.Properties.First().Name);
 
-            RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal("PrincipalAnotherFk", relationshipBuilder.Metadata.Properties.First().Name);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_on_field_sets_foreign_key_properties_when_applied_on_property_on_dependent_side()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_on_field_sets_foreign_key_properties_when_applied_on_property_on_dependent_side(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<DependentField>();
             var principalEntityTypeBuilder =
@@ -631,21 +682,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            DependentField.PrincipalIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { DependentField.PrincipalIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Convention);
 
             Assert.Equal("PrincipalFieldId", relationshipBuilder.Metadata.Properties.First().Name);
 
-            RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal("_principalFieldAnotherFk", relationshipBuilder.Metadata.Properties.First().Name);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_sets_foreign_key_properties_after_inverting_when_applied_on_property_on_principal_side()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_sets_foreign_key_properties_after_inverting_when_applied_on_property_on_principal_side(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Principal>();
             var principalEntityTypeBuilder =
@@ -658,25 +716,32 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            Principal.DependentIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { Principal.DependentIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Convention);
 
             Assert.Equal("DependentId", relationshipBuilder.Metadata.Properties.First().Name);
             Assert.Equal(typeof(Principal), relationshipBuilder.Metadata.DeclaringEntityType.ClrType);
             Assert.Equal(typeof(Dependent), relationshipBuilder.Metadata.PrincipalEntityType.ClrType);
 
-            relationshipBuilder = RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.PrincipalToDependent;
+                relationshipBuilder = RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                relationshipBuilder = RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal("PrincipalAnotherFk", relationshipBuilder.Metadata.Properties.First().Name);
             Assert.Equal(typeof(Dependent), relationshipBuilder.Metadata.DeclaringEntityType.ClrType);
             Assert.Equal(typeof(Principal), relationshipBuilder.Metadata.PrincipalEntityType.ClrType);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_sets_composite_foreign_key_properties_when_applied_on_navigation()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_sets_composite_foreign_key_properties_when_applied_on_navigation(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Dependent>();
             var principalEntityTypeBuilder =
@@ -689,15 +754,20 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                     ConfigurationSource.Convention)
                 .HasForeignKey(
                     dependentEntityTypeBuilder.GetOrCreateProperties(
-                        new List<PropertyInfo>
-                        {
-                            Dependent.PrincipalIdProperty
-                        }, ConfigurationSource.Convention),
+                        new List<PropertyInfo> { Dependent.PrincipalIdProperty }, ConfigurationSource.Convention),
                     ConfigurationSource.Convention);
 
             Assert.Equal("PrincipalId", relationshipBuilder.Metadata.Properties.First().Name);
 
-            relationshipBuilder = RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.PrincipalToDependent;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal(2, relationshipBuilder.Metadata.Properties.Count);
             Assert.Collection(
@@ -706,8 +776,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 p => Assert.Equal("PrincipalFk", p.Name));
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_throws_when_values_on_property_and_navigation_in_entity_type_do_not_match()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_throws_when_values_on_property_and_navigation_in_entity_type_do_not_match(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<FkPropertyNavigationMismatch>();
             var principalEntityTypeBuilder =
@@ -719,13 +791,20 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 null,
                 ConfigurationSource.Convention);
 
+            var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
             Assert.Equal(
                 CoreStrings.FkAttributeOnPropertyNavigationMismatch("PrincipalId", "Principal", nameof(FkPropertyNavigationMismatch)),
-                Assert.Throws<InvalidOperationException>(() => RunConvention(relationshipBuilder)).Message);
+                Assert.Throws<InvalidOperationException>(
+                    () => useNavigation
+                        ? RunForeignKeyAttributeConvention(relationshipBuilder, navigation)
+                        : RunForeignKeyAttributeConvention(relationshipBuilder)
+                    ).Message);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_throws_when_defining_composite_foreign_key_using_attribute_on_properties()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_throws_when_defining_composite_foreign_key_using_attribute_on_properties(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<CompositeFkOnProperty>();
             var principalEntityTypeBuilder =
@@ -737,13 +816,20 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 null,
                 ConfigurationSource.Convention);
 
+            var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
             Assert.Equal(
                 CoreStrings.CompositeFkOnProperty("Principal", nameof(CompositeFkOnProperty)),
-                Assert.Throws<InvalidOperationException>(() => RunConvention(relationshipBuilder)).Message);
+                Assert.Throws<InvalidOperationException>(
+                    () => useNavigation
+                        ? RunForeignKeyAttributeConvention(relationshipBuilder, navigation)
+                        : RunForeignKeyAttributeConvention(relationshipBuilder)
+                    ).Message);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_throws_when_property_list_on_navigation_is_in_incorrect_format()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_throws_when_property_list_on_navigation_is_in_incorrect_format(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<InvalidPropertyListOnNavigation>();
             var principalEntityTypeBuilder =
@@ -755,13 +841,20 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 null,
                 ConfigurationSource.Convention);
 
+            var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
             Assert.Equal(
                 CoreStrings.InvalidPropertyListOnNavigation("Principal", nameof(InvalidPropertyListOnNavigation)),
-                Assert.Throws<InvalidOperationException>(() => RunConvention(relationshipBuilder)).Message);
+                Assert.Throws<InvalidOperationException>(
+                    () => useNavigation
+                        ? RunForeignKeyAttributeConvention(relationshipBuilder, navigation)
+                        : RunForeignKeyAttributeConvention(relationshipBuilder)
+                    ).Message);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_throws_when_same_set_of_properties_are_pointed_by_multiple_navigations()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_throws_when_same_set_of_properties_are_pointed_by_multiple_navigations(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<MultipleNavigationsSameFk>();
             var principalEntityTypeBuilder =
@@ -773,13 +866,20 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 null,
                 ConfigurationSource.Convention);
 
+            var navigation = relationshipBuilder.Metadata.DependentToPrincipal;
             Assert.Equal(
                 CoreStrings.MultipleNavigationsSameFk(typeof(MultipleNavigationsSameFk).Name, "CommonFkProperty"),
-                Assert.Throws<InvalidOperationException>(() => RunConvention(relationshipBuilder)).Message);
+                Assert.Throws<InvalidOperationException>(
+                    () => useNavigation
+                        ? RunForeignKeyAttributeConvention(relationshipBuilder, navigation)
+                        : RunForeignKeyAttributeConvention(relationshipBuilder)
+                    ).Message);
         }
 
-        [ConditionalFact]
-        public void ForeignKeyAttribute_throws_when_specified_on_principal_property_with_collection()
+        [ConditionalTheory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public void ForeignKeyAttribute_throws_when_specified_on_principal_property_with_collection(bool useNavigation)
         {
             var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<Dependent>();
             var principalEntityTypeBuilder = dependentEntityTypeBuilder.ModelBuilder.Entity(
@@ -791,7 +891,15 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 nameof(InvertedPrincipal.Dependents),
                 ConfigurationSource.Convention);
 
-            RunConvention(relationshipBuilder);
+            if (useNavigation)
+            {
+                var navigation = relationshipBuilder.Metadata.PrincipalToDependent;
+                RunForeignKeyAttributeConvention(relationshipBuilder, navigation);
+            }
+            else
+            {
+                RunForeignKeyAttributeConvention(relationshipBuilder);
+            }
 
             Assert.Equal(
                 CoreStrings.FkAttributeOnNonUniquePrincipal(
@@ -801,7 +909,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 Assert.Throws<InvalidOperationException>(() => Validate(dependentEntityTypeBuilder)).Message);
         }
 
-        private void RunConvention(InternalEntityTypeBuilder entityTypeBuilder)
+        private void RunEntityTypeConventions(InternalEntityTypeBuilder entityTypeBuilder)
         {
             var dependencies = CreateDependencies(CreateLogger());
             var context = new ConventionContext<IConventionEntityTypeBuilder>(
@@ -817,26 +925,51 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 .ProcessEntityTypeAdded(entityTypeBuilder, context);
         }
 
-        private InternalRelationshipBuilder RunConvention(InternalRelationshipBuilder relationshipBuilder)
+        private InternalForeignKeyBuilder RunForeignKeyAttributeConvention(InternalForeignKeyBuilder relationshipBuilder)
         {
             var dependencies = CreateDependencies(CreateLogger());
-            var context = new ConventionContext<IConventionRelationshipBuilder>(
+            var context = new ConventionContext<IConventionForeignKeyBuilder>(
                 relationshipBuilder.Metadata.DeclaringEntityType.Model.ConventionDispatcher);
 
             new ForeignKeyAttributeConvention(dependencies)
                 .ProcessForeignKeyAdded(relationshipBuilder, context);
 
-            return context.ShouldStopProcessing() ? (InternalRelationshipBuilder)context.Result : relationshipBuilder;
+            return context.ShouldStopProcessing() ? (InternalForeignKeyBuilder)context.Result : relationshipBuilder;
         }
 
-        private void RunConvention(InternalRelationshipBuilder relationshipBuilder, Navigation navigation)
+        private InternalForeignKeyBuilder RunForeignKeyAttributeConvention(
+            InternalForeignKeyBuilder relationshipBuilder, Navigation navigation)
         {
             var dependencies = CreateDependencies(CreateLogger());
-            var context = new ConventionContext<IConventionNavigation>(
+            var context = new ConventionContext<IConventionNavigationBuilder>(
+                relationshipBuilder.Metadata.DeclaringEntityType.Model.ConventionDispatcher);
+
+            new ForeignKeyAttributeConvention(dependencies)
+                .ProcessNavigationAdded(navigation.Builder, context);
+
+            return context.ShouldStopProcessing()
+                ? (InternalForeignKeyBuilder)context.Result?.Metadata.ForeignKey.Builder
+                : relationshipBuilder;
+        }
+
+        private void RunRequiredNavigationAttributeConvention(InternalForeignKeyBuilder relationshipBuilder, Navigation navigation)
+        {
+            var dependencies = CreateDependencies(CreateLogger());
+            var context = new ConventionContext<IConventionNavigationBuilder>(
                 relationshipBuilder.Metadata.DeclaringEntityType.Model.ConventionDispatcher);
 
             new RequiredNavigationAttributeConvention(dependencies)
-                .ProcessNavigationAdded(relationshipBuilder, navigation, context);
+                .ProcessNavigationAdded(navigation.Builder, context);
+        }
+
+        private void RunNavigationBackingFieldAttributeConvention(InternalForeignKeyBuilder relationshipBuilder, InternalNavigationBuilder navigationBuilder)
+        {
+            var dependencies = CreateDependencies(CreateLogger());
+            var context = new ConventionContext<IConventionNavigationBuilder>(
+                relationshipBuilder.Metadata.DeclaringEntityType.Model.ConventionDispatcher);
+
+            new NavigationBackingFieldAttributeConvention(dependencies)
+                .ProcessNavigationAdded(navigationBuilder, context);
         }
 
         private void Validate(InternalEntityTypeBuilder entityTypeBuilder)
@@ -846,13 +979,59 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 entityTypeBuilder.Metadata.Model.ConventionDispatcher);
 
             new KeyAttributeConvention(dependencies)
-                .ProcessModelFinalized(entityTypeBuilder.ModelBuilder, context);
+                .ProcessModelFinalizing(entityTypeBuilder.ModelBuilder, context);
 
             new InversePropertyAttributeConvention(dependencies)
-                .ProcessModelFinalized(entityTypeBuilder.ModelBuilder, context);
+                .ProcessModelFinalizing(entityTypeBuilder.ModelBuilder, context);
 
             new ForeignKeyAttributeConvention(dependencies)
-                .ProcessModelFinalized(entityTypeBuilder.ModelBuilder, context);
+                .ProcessModelFinalizing(entityTypeBuilder.ModelBuilder, context);
+        }
+
+        #endregion
+
+        #region BackingFieldAttribute
+
+        [ConditionalFact]
+        public void BackingFieldAttribute_overrides_configuration_from_convention_source()
+        {
+            var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<DependentForNavWithBackingField>();
+            var principalEntityTypeBuilder =
+                dependentEntityTypeBuilder.ModelBuilder.Entity(
+                    typeof(PrincipalForNavWithBackingField), ConfigurationSource.Convention);
+
+            var relationshipBuilder = dependentEntityTypeBuilder.HasRelationship(
+                    principalEntityTypeBuilder.Metadata,
+                    "PrincipalForNavWithBackingField",
+                    "DependentForNavWithBackingField",
+                    ConfigurationSource.Convention);
+
+            var navigationBuilder = relationshipBuilder.Metadata.DependentToPrincipal.Builder;
+            RunNavigationBackingFieldAttributeConvention(relationshipBuilder, navigationBuilder);
+
+            Assert.Equal("_backingFieldFromAttribute", navigationBuilder.Metadata.GetFieldName());
+        }
+
+        [ConditionalFact]
+        public void BackingFieldAttribute_does_not_override_configuration_from_explicit_source()
+        {
+            var dependentEntityTypeBuilder = CreateInternalEntityTypeBuilder<DependentForNavWithBackingField>();
+            var principalEntityTypeBuilder =
+                dependentEntityTypeBuilder.ModelBuilder.Entity(
+                    typeof(PrincipalForNavWithBackingField), ConfigurationSource.Convention);
+
+            var relationshipBuilder = dependentEntityTypeBuilder.HasRelationship(
+                    principalEntityTypeBuilder.Metadata,
+                    "PrincipalForNavWithBackingField",
+                    "DependentForNavWithBackingField",
+                    ConfigurationSource.Convention);
+
+            var navigationBuilder = relationshipBuilder.Metadata.DependentToPrincipal.Builder;
+            navigationBuilder.HasField("_backingFieldFromFluentApi", ConfigurationSource.Explicit);
+
+            RunNavigationBackingFieldAttributeConvention(relationshipBuilder, navigationBuilder);
+
+            Assert.Equal("_backingFieldFromFluentApi", navigationBuilder.Metadata.GetFieldName());
         }
 
         #endregion
@@ -894,7 +1073,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
         }
 
         private static ProviderConventionSetBuilderDependencies CreateDependencies(DiagnosticsLogger<DbLoggerCategory.Model> logger)
-            => InMemoryTestHelpers.Instance.CreateContextServices().GetRequiredService<ProviderConventionSetBuilderDependencies>().With(logger);
+            => InMemoryTestHelpers.Instance.CreateContextServices().GetRequiredService<ProviderConventionSetBuilderDependencies>()
+                .With(logger);
 
         private DiagnosticsLogger<DbLoggerCategory.Model> CreateLogger()
         {
@@ -905,7 +1085,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 ListLoggerFactory,
                 options,
                 new DiagnosticListener("Fake"),
-                new TestLoggingDefinitions());
+                new TestLoggingDefinitions(),
+                new NullDbContextLogger());
             return modelLogger;
         }
 
@@ -1119,6 +1300,28 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             public int DependentId { get; set; }
 
             public ICollection<Dependent> Dependents { get; set; }
+        }
+
+        private class PrincipalForNavWithBackingField
+        {
+            public int Id { get; set; }
+
+            public DependentForNavWithBackingField DependentForNavWithBackingField { get; set; }
+        }
+
+        private class DependentForNavWithBackingField
+        {
+            public int Id { get; set; }
+
+#pragma warning disable IDE0044 // Add readonly modifier
+#pragma warning disable CS0169 // Field never used
+            private PrincipalForNavWithBackingField _backingFieldFromAttribute;
+            private PrincipalForNavWithBackingField _backingFieldFromFluentApi;
+#pragma warning restore CS0169 // Field never used
+#pragma warning restore IDE0044 // Add readonly modifier
+
+            [BackingField(nameof(_backingFieldFromAttribute))]
+            public PrincipalForNavWithBackingField PrincipalForNavWithBackingField { get; set; }
         }
     }
 }

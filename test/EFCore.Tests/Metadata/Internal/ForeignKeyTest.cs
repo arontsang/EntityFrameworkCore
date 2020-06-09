@@ -114,11 +114,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             var property2 = principalEntityType.AddProperty("Id1", typeof(int));
             var property3 = principalEntityType.AddProperty("Id2", typeof(int));
             principalEntityType.SetPrimaryKey(
-                new[]
-                {
-                    property2,
-                    property3
-                });
+                new[] { property2, property3 });
 
             Assert.Equal(
                 CoreStrings.ForeignKeyTypeMismatch("{'P1', 'P2'}", "D", "{'Id1', 'Id2'}", "P"),
@@ -186,11 +182,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             var property1 = entityType.AddProperty("Id2", typeof(string));
             property1.IsNullable = false;
             entityType.SetPrimaryKey(
-                new[]
-                {
-                    property,
-                    property1
-                });
+                new[] { property, property1 });
 
             var dependentProp1 = entityType.AddProperty("P1", typeof(int));
             var dependentProp2 = entityType.AddProperty("P2", typeof(string));
@@ -212,11 +204,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             var property3 = entityType.AddProperty("Id2", typeof(string));
             property3.IsNullable = false;
             entityType.SetPrimaryKey(
-                new[]
-                {
-                    property,
-                    property3
-                });
+                new[] { property, property3 });
 
             var dependentProp1 = entityType.AddProperty("P1", typeof(int));
             var dependentProp2 = entityType.AddProperty("P2", typeof(string));
@@ -237,11 +225,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             var property1 = entityType.AddProperty("Id2", typeof(string));
             property1.IsNullable = false;
             entityType.SetPrimaryKey(
-                new[]
-                {
-                    property,
-                    property1
-                });
+                new[] { property, property1 });
 
             var dependentProp1 = entityType.AddProperty("P1", typeof(int?));
             dependentProp1.IsNullable = false;
@@ -266,8 +250,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             var dependentEntityType = model.AddEntityType(typeof(OneToManyDependent));
             var fkProp = dependentEntityType.AddProperty(NavigationBase.IdProperty);
             var fk = dependentEntityType.AddForeignKey(new[] { fkProp }, pk, principalEntityType);
-            fk.HasPrincipalToDependent(NavigationBase.OneToManyDependentsProperty);
-            fk.HasDependentToPrincipal(NavigationBase.OneToManyPrincipalProperty);
+            fk.SetPrincipalToDependent(NavigationBase.OneToManyDependentsProperty);
+            fk.SetDependentToPrincipal(NavigationBase.OneToManyPrincipalProperty);
             return fk;
         }
 
@@ -286,8 +270,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             dependentEntityType.BaseType = baseEntityType;
             var fkProp = dependentEntityType.AddProperty("Fk", typeof(int));
             var fk = dependentEntityType.AddForeignKey(new[] { fkProp }, pk, principalEntityType);
-            fk.HasPrincipalToDependent(NavigationBase.OneToManyDependentsProperty);
-            fk.HasDependentToPrincipal(NavigationBase.OneToManyPrincipalProperty);
+            fk.SetPrincipalToDependent(NavigationBase.OneToManyDependentsProperty);
+            fk.SetDependentToPrincipal(NavigationBase.OneToManyPrincipalProperty);
             return fk;
         }
 
@@ -303,7 +287,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             dependentEntityType.BaseType = baseEntityType;
             var fkProp = dependentEntityType.AddProperty("Fk", typeof(int));
             var fk = dependentEntityType.AddForeignKey(new[] { fkProp }, pk, baseEntityType);
-            fk.HasPrincipalToDependent(NavigationBase.OneToManyDependentsProperty);
+            fk.SetPrincipalToDependent(NavigationBase.OneToManyDependentsProperty);
             return fk;
         }
 
@@ -345,7 +329,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         public void Throws_when_setting_navigation_to_principal_on_wrong_FK()
         {
             var foreignKey1 = CreateOneToManyFK();
-            foreignKey1.HasDependentToPrincipal(OneToManyDependent.DeceptionProperty);
+            foreignKey1.SetDependentToPrincipal(OneToManyDependent.DeceptionProperty);
 
             var newFkProp = foreignKey1.DeclaringEntityType.AddProperty("FkProp", typeof(int));
             var foreignKey2 = foreignKey1.DeclaringEntityType.AddForeignKey(
@@ -361,14 +345,14 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                     foreignKey1.Properties.Format()),
                 Assert.Throws<InvalidOperationException>(
                     ()
-                        => foreignKey2.HasDependentToPrincipal(OneToManyDependent.DeceptionProperty)).Message);
+                        => foreignKey2.SetDependentToPrincipal(OneToManyDependent.DeceptionProperty)).Message);
         }
 
         [ConditionalFact]
         public void Throws_when_setting_navigation_to_dependent_on_wrong_FK()
         {
             var foreignKey1 = CreateOneToManyFK();
-            foreignKey1.HasDependentToPrincipal(OneToManyDependent.DeceptionProperty);
+            foreignKey1.SetDependentToPrincipal(OneToManyDependent.DeceptionProperty);
 
             var newFkProp = foreignKey1.DeclaringEntityType.AddProperty("FkProp", typeof(int));
             var foreignKey2 = foreignKey1.DeclaringEntityType.AddForeignKey(
@@ -384,7 +368,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                     foreignKey1.Properties.Format()),
                 Assert.Throws<InvalidOperationException>(
                     ()
-                        => foreignKey2.HasDependentToPrincipal(OneToManyDependent.DeceptionProperty)).Message);
+                        => foreignKey2.SetDependentToPrincipal(OneToManyDependent.DeceptionProperty)).Message);
         }
 
         private IMutableForeignKey CreateSelfRefFK(bool useAltKey = false)
@@ -400,8 +384,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
 
             var fk = entityType.AddForeignKey(new[] { fkProp }, principalKey, entityType);
             fk.IsUnique = true;
-            fk.HasDependentToPrincipal(SelfRef.SelfRefPrincipalProperty);
-            fk.HasPrincipalToDependent(SelfRef.SelfRefDependentProperty);
+            fk.SetDependentToPrincipal(SelfRef.SelfRefPrincipalProperty);
+            fk.SetPrincipalToDependent(SelfRef.SelfRefDependentProperty);
             return fk;
         }
 
@@ -456,46 +440,6 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             var fk = CreateOneToManyFK();
 
             Assert.False(fk.IsSelfReferencing());
-        }
-
-        [ConditionalFact]
-        public void IsIntraHierarchical_returns_true_for_self_ref_foreign_keys()
-        {
-            var fk = CreateSelfRefFK();
-
-            Assert.True(fk.IsIntraHierarchical());
-        }
-
-        [ConditionalFact]
-        public void IsIntraHierarchical_returns_true_for_non_pk_self_ref_foreign_keys()
-        {
-            var fk = CreateSelfRefFK(useAltKey: true);
-
-            Assert.True(fk.IsIntraHierarchical());
-        }
-
-        [ConditionalFact]
-        public void IsIntraHierarchical_returns_true_for_same_hierarchy_foreign_keys()
-        {
-            var fk = CreateOneToManySameHierarchyFK();
-
-            Assert.True(fk.IsIntraHierarchical());
-        }
-
-        [ConditionalFact]
-        public void IsIntraHierarchical_returns_false_for_same_base_foreign_keys()
-        {
-            var fk = CreateOneToManySameBaseFK();
-
-            Assert.False(fk.IsIntraHierarchical());
-        }
-
-        [ConditionalFact]
-        public void IsIntraHierarchical_returns_false_for_non_hierarchical_foreign_keys()
-        {
-            var fk = CreateOneToManyFK();
-
-            Assert.False(fk.IsIntraHierarchical());
         }
 
         [ConditionalFact]

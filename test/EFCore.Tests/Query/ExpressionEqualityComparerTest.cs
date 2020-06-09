@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 using Xunit;
 
 // ReSharper disable AssignNullToNotNullAttribute
@@ -33,19 +32,12 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             Expression e1 = Expression.MemberInit(
                 Expression.New(typeof(Node)),
-                new List<MemberBinding>
-                {
-                    bindingMessages
-                }
+                new List<MemberBinding> { bindingMessages }
             );
 
             Expression e2 = Expression.MemberInit(
                 Expression.New(typeof(Node)),
-                new List<MemberBinding>
-                {
-                    bindingMessages,
-                    bindingDescriptions
-                }
+                new List<MemberBinding> { bindingMessages, bindingDescriptions }
             );
 
             Assert.NotEqual(expressionComparer.GetHashCode(e1), expressionComparer.GetHashCode(e2));

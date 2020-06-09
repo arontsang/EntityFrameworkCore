@@ -10,7 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Internal;
-using Microsoft.EntityFrameworkCore.Query.Internal;
+using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.TestModels.Northwind;
 using Xunit;
 
@@ -27,7 +27,7 @@ namespace Microsoft.EntityFrameworkCore
             var q = new List<Customer>().AsQueryable();
             var q2 = q.Include(c => c.Orders).ThenInclude(o => o.OrderDetails).ToList();
 
-            Assert.Equal(0, q2.Count);
+            Assert.Empty(q2);
         }
 
         [ConditionalFact]
@@ -36,7 +36,7 @@ namespace Microsoft.EntityFrameworkCore
             var q = new List<Customer>().AsQueryable();
             var q2 = q.AsTracking().ToList();
 
-            Assert.Equal(0, q2.Count);
+            Assert.Empty(q2);
         }
 
         [ConditionalFact]
@@ -45,7 +45,7 @@ namespace Microsoft.EntityFrameworkCore
             var q = new List<Customer>().AsQueryable();
             var q2 = q.AsNoTracking().ToList();
 
-            Assert.Equal(0, q2.Count);
+            Assert.Empty(q2);
         }
 
         // ReSharper disable MethodSupportsCancellation
@@ -155,7 +155,7 @@ namespace Microsoft.EntityFrameworkCore
 
                 var cancellationTokenPresent
                     = (_expectedMethodCall.Arguments[_expectedMethodCall.Arguments.Count - 1] is MemberExpression lastArgument)
-                      && (lastArgument.Type == typeof(CancellationToken));
+                    && (lastArgument.Type == typeof(CancellationToken));
 
                 if (cancellationTokenPresent)
                 {
@@ -301,11 +301,11 @@ namespace Microsoft.EntityFrameworkCore
             await SourceNonAsyncQueryableTest(() => Source<decimal?>().SumAsync(e => e));
             await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e));
             await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e, e => e));
-            await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e, ReferenceEqualityComparer.Instance));
-            await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e, ReferenceEqualityComparer.Instance));
-            await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e, e => e, ReferenceEqualityComparer.Instance));
+            await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e, LegacyReferenceEqualityComparer.Instance));
+            await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e, LegacyReferenceEqualityComparer.Instance));
+            await SourceNonAsyncEnumerableTest<int>(() => Source().ToDictionaryAsync(e => e, e => e, LegacyReferenceEqualityComparer.Instance));
             await SourceNonAsyncEnumerableTest<int>(
-                () => Source().ToDictionaryAsync(e => e, e => e, ReferenceEqualityComparer.Instance, new CancellationToken()));
+                () => Source().ToDictionaryAsync(e => e, e => e, LegacyReferenceEqualityComparer.Instance, new CancellationToken()));
             await SourceNonAsyncEnumerableTest<int>(() => Source().ToListAsync());
 
             Assert.Equal(

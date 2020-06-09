@@ -50,7 +50,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var parameters = constructorBinding.Constructor.GetParameters();
             var bindings = constructorBinding.ParameterBindings;
 
-            Assert.Equal(0, parameters.Length);
+            Assert.Empty(parameters);
             Assert.Equal(0, bindings.Count);
         }
 
@@ -118,7 +118,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var parameters = constructorBinding.Constructor.GetParameters();
             var bindings = constructorBinding.ParameterBindings;
 
-            Assert.Equal(1, parameters.Length);
+            Assert.Single(parameters);
             Assert.Equal(1, bindings.Count);
 
             Assert.Equal("loader", parameters[0].Name);
@@ -389,11 +389,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var constructorBinding = GetBinding<BlogConflict>(
                 e => e[CoreAnnotationNames.ConstructorBinding] = new ConstructorBinding(
                     typeof(BlogConflict).GetConstructor(
-                        new[]
-                        {
-                            typeof(string),
-                            typeof(int)
-                        }),
+                        new[] { typeof(string), typeof(int) }),
                     new[]
                     {
                         new PropertyParameterBinding(e.FindProperty(nameof(Blog.Title))),
@@ -553,7 +549,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var parameters = constructorBinding.Constructor.GetParameters();
             var bindings = constructorBinding.ParameterBindings;
 
-            Assert.Equal(1, parameters.Length);
+            Assert.Single(parameters);
             Assert.Equal(1, bindings.Count);
 
             Assert.Equal("context", parameters[0].Name);
@@ -580,7 +576,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var parameters = constructorBinding.Constructor.GetParameters();
             var bindings = constructorBinding.ParameterBindings;
 
-            Assert.Equal(1, parameters.Length);
+            Assert.Single(parameters);
             Assert.Equal(1, bindings.Count);
 
             Assert.Equal("loader", parameters[0].Name);
@@ -607,7 +603,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var parameters = constructorBinding.Constructor.GetParameters();
             var bindings = constructorBinding.ParameterBindings;
 
-            Assert.Equal(1, parameters.Length);
+            Assert.Single(parameters);
             Assert.Equal(1, bindings.Count);
 
             Assert.Equal("lazyLoader", parameters[0].Name);
@@ -634,7 +630,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var parameters = constructorBinding.Constructor.GetParameters();
             var bindings = constructorBinding.ParameterBindings;
 
-            Assert.Equal(1, parameters.Length);
+            Assert.Single(parameters);
             Assert.Equal(1, bindings.Count);
 
             Assert.Equal("entityType", parameters[0].Name);
@@ -660,7 +656,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var parameters = constructorBinding.Constructor.GetParameters();
             var bindings = constructorBinding.ParameterBindings;
 
-            Assert.Equal(0, parameters.Length);
+            Assert.Empty(parameters);
             Assert.Equal(0, bindings.Count);
         }
 
@@ -736,12 +732,10 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
         [ConditionalFact]
         public void Throws_in_validation_if_field_not_found()
         {
-            using (var context = new NoFieldContext())
-            {
-                Assert.Equal(
-                    CoreStrings.NoBackingFieldLazyLoading("NoFieldRelated", "NoField"),
-                    Assert.Throws<InvalidOperationException>(() => context.Model).Message);
-            }
+            using var context = new NoFieldContext();
+            Assert.Equal(
+                CoreStrings.NoBackingFieldLazyLoading("NoFieldRelated", "NoField"),
+                Assert.Throws<InvalidOperationException>(() => context.Model).Message);
         }
 
         private class NoFieldContext : DbContext
@@ -800,7 +794,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var context = new ConventionContext<IConventionModelBuilder>(model.ConventionDispatcher);
 
             var convention = new ConstructorBindingConvention(CreateDependencies());
-            convention.ProcessModelFinalized(model.Builder, context);
+            convention.ProcessModelFinalizing(model.Builder, context);
 
             return (ConstructorBinding)entityType[CoreAnnotationNames.ConstructorBinding];
         }

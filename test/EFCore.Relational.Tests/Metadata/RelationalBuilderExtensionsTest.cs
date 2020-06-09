@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Xunit;
+
 // ReSharper disable InconsistentNaming
 
 namespace Microsoft.EntityFrameworkCore.Metadata
@@ -394,7 +395,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata
         }
 
         [ConditionalFact]
-        public void Default_index_name_is_based_on_index_column_names()
+        public void Default_index_database_name_is_based_on_index_column_names()
         {
             var modelBuilder = CreateConventionModelBuilder();
 
@@ -404,29 +405,29 @@ namespace Microsoft.EntityFrameworkCore.Metadata
 
             var index = modelBuilder.Model.FindEntityType(typeof(Customer)).GetIndexes().Single();
 
-            Assert.Equal("IX_Customer_Id", index.GetName());
+            Assert.Equal("IX_Customer_Id", index.GetDatabaseName());
 
             modelBuilder
                 .Entity<Customer>()
                 .Property(e => e.Id)
                 .HasColumnName("Eendax");
 
-            Assert.Equal("IX_Customer_Eendax", index.GetName());
+            Assert.Equal("IX_Customer_Eendax", index.GetDatabaseName());
         }
 
         [ConditionalFact]
-        public void Can_set_index_name()
+        public void Can_set_index_database_name()
         {
             var modelBuilder = CreateConventionModelBuilder();
 
             modelBuilder
                 .Entity<Customer>()
                 .HasIndex(e => e.Id)
-                .HasName("Eeeendeeex");
+                .HasDatabaseName("Eeeendeeex");
 
             var index = modelBuilder.Model.FindEntityType(typeof(Customer)).GetIndexes().Single();
 
-            Assert.Equal("Eeeendeeex", index.GetName());
+            Assert.Equal("Eeeendeeex", index.GetDatabaseName());
         }
 
         [ConditionalFact]
@@ -541,28 +542,29 @@ namespace Microsoft.EntityFrameworkCore.Metadata
 
             Assert.Equal(
                 RelationalStrings.DuplicateCheckConstraint("CK_Customer_AlternateId", entityType.DisplayName()),
-                Assert.Throws<InvalidOperationException>(() =>
-                       entityType.AddCheckConstraint("CK_Customer_AlternateId", "AlternateId < Id")).Message);
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        entityType.AddCheckConstraint("CK_Customer_AlternateId", "AlternateId < Id")).Message);
         }
 
         [ConditionalFact]
-        public void RemoveCheckConstraint_returns_true_when_constraint_exists()
+        public void RemoveCheckConstraint_returns_constraint_when_constraint_exists()
         {
             var entityTypeBuilder = CreateConventionModelBuilder().Entity<Customer>();
             var entityType = entityTypeBuilder.Metadata;
 
-            entityType.AddCheckConstraint("CK_Customer_AlternateId", "AlternateId > Id");
+            var constraint = entityType.AddCheckConstraint("CK_Customer_AlternateId", "AlternateId > Id");
 
-            Assert.True(entityType.RemoveCheckConstraint("CK_Customer_AlternateId"));
+            Assert.Same(constraint, entityType.RemoveCheckConstraint("CK_Customer_AlternateId"));
         }
 
         [ConditionalFact]
-        public void RemoveCheckConstraint_returns_false_when_constraint_is_missing()
+        public void RemoveCheckConstraint_returns_null_when_constraint_is_missing()
         {
             var entityTypeBuilder = CreateConventionModelBuilder().Entity<Customer>();
             var entityType = entityTypeBuilder.Metadata;
 
-            Assert.False(entityType.RemoveCheckConstraint("CK_Customer_AlternateId"));
+            Assert.Null(entityType.RemoveCheckConstraint("CK_Customer_AlternateId"));
         }
 
         [ConditionalFact]

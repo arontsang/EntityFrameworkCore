@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Storage
@@ -75,9 +74,9 @@ namespace Microsoft.EntityFrameworkCore.Storage
         public virtual DbCommand DbCommand => _command;
 
         /// <summary>
-        ///     Calls Read on the underlying DbDataReader.
+        ///     Calls <see cref="System.Data.Common.DbDataReader.Read()"/> on the underlying <see cref="System.Data.Common.DbDataReader"/>.
         /// </summary>
-        /// <returns>true if there are more rows; otherwise false.</returns>
+        /// <returns> <see langword="true"/> if there are more rows; otherwise <see langword="false"/>. </returns>
         public virtual bool Read()
         {
             _readCount++;
@@ -86,9 +85,10 @@ namespace Microsoft.EntityFrameworkCore.Storage
         }
 
         /// <summary>
-        ///     Calls Read on the underlying DbDataReader.
+        ///     Calls <see cref="System.Data.Common.DbDataReader.ReadAsync(CancellationToken)"/> on the underlying
+        ///     <see cref="System.Data.Common.DbDataReader"/>.
         /// </summary>
-        /// <returns>true if there are more rows; otherwise false.</returns>
+        /// <returns> <see langword="true"/> if there are more rows; otherwise <see langword="false"/>. </returns>
         public virtual Task<bool> ReadAsync(CancellationToken cancellationToken = default)
         {
             _readCount++;
@@ -167,10 +167,10 @@ namespace Microsoft.EntityFrameworkCore.Storage
 
                     if (!interceptionResult.IsSuppressed)
                     {
-                        await _reader.DisposeAsync();
+                        await _reader.DisposeAsync().ConfigureAwait(false);
                         _command.Parameters.Clear();
-                        await _command.DisposeAsync();
-                        await _connection.CloseAsync();
+                        await _command.DisposeAsync().ConfigureAwait(false);
+                        await _connection.CloseAsync().ConfigureAwait(false);
                     }
                 }
             }

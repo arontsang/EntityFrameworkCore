@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestModels.SpatialModel;
 using Microsoft.EntityFrameworkCore.TestUtilities;
-using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
 using NetTopologySuite.Geometries;
 using Xunit;
 
@@ -24,37 +23,25 @@ namespace Microsoft.EntityFrameworkCore
         [ConditionalFact]
         public virtual void Values_are_copied_into_change_tracker()
         {
-            using (var db = Fixture.CreateContext())
-            {
-                var entity = new PointEntity
-                {
-                    Id = Guid.NewGuid(),
-                    Point = new Point(0, 0)
-                };
-                db.Attach(entity);
+            using var db = Fixture.CreateContext();
+            var entity = new PointEntity { Id = Guid.NewGuid(), Point = new Point(0, 0) };
+            db.Attach(entity);
 
-                entity.Point.X = 1;
+            entity.Point.X = 1;
 
-                Assert.Equal(0, db.Entry(entity).Property(e => e.Point).OriginalValue.X);
-            }
+            Assert.Equal(0, db.Entry(entity).Property(e => e.Point).OriginalValue.X);
         }
 
         [ConditionalFact]
         public virtual void Values_arent_compared_by_reference()
         {
-            using (var db = Fixture.CreateContext())
-            {
-                var entity = new PointEntity
-                {
-                    Id = Guid.NewGuid(),
-                    Point = new Point(0, 0)
-                };
-                db.Attach(entity);
+            using var db = Fixture.CreateContext();
+            var entity = new PointEntity { Id = Guid.NewGuid(), Point = new Point(0, 0) };
+            db.Attach(entity);
 
-                entity.Point = new Point(0, 0);
+            entity.Point = new Point(0, 0);
 
-                Assert.False(db.Entry(entity).Property(e => e.Point).IsModified);
-            }
+            Assert.False(db.Entry(entity).Property(e => e.Point).IsModified);
         }
 
         [ConditionalFact]
@@ -77,16 +64,8 @@ namespace Microsoft.EntityFrameworkCore
                 context =>
                 {
                     context.AddRange(
-                        new PointEntity
-                        {
-                            Id = id1,
-                            Point = point
-                        },
-                        new PolygonEntity
-                        {
-                            Id = id2,
-                            Polygon = polygon
-                        });
+                        new PointEntity { Id = id1, Point = point },
+                        new PolygonEntity { Id = id2, Polygon = polygon });
 
                     context.SaveChanges();
                 },
@@ -121,18 +100,35 @@ namespace Microsoft.EntityFrameworkCore
         [ConditionalFact]
         public virtual void Translators_handle_static_members()
         {
-            using (var db = Fixture.CreateContext())
-            {
-                (from e in db.Set<PointEntity>()
-                select new
-                {
-                    e.Id,
-                    e.Point,
-                    Point.Empty,
-                    DateTime.UtcNow,
-                    Guid = Guid.NewGuid()
-                }).FirstOrDefault();
-            }
+            using var db = Fixture.CreateContext();
+            (from e in db.Set<PointEntity>()
+             select new
+             {
+                 e.Id,
+                 e.Point,
+                 Point.Empty,
+                 DateTime.UtcNow,
+                 Guid = Guid.NewGuid()
+             }).FirstOrDefault();
+        }
+
+        [ConditionalFact]
+        public virtual void Can_roundtrip_Z_and_M()
+        {
+            using var db = Fixture.CreateContext();
+            var entity = db.Set<PointEntity>()
+                .FirstOrDefault(e => e.Id == PointEntity.WellKnownId);
+
+            Assert.NotNull(entity);
+            Assert.NotNull(entity.Point);
+            Assert.True(double.IsNaN(entity.Point.Z));
+            Assert.True(double.IsNaN(entity.Point.M));
+            Assert.Equal(0, entity.PointZ.Z);
+            Assert.True(double.IsNaN(entity.PointZ.M));
+            Assert.True(double.IsNaN(entity.PointM.Z));
+            Assert.Equal(0, entity.PointM.M);
+            Assert.Equal(0, entity.PointZM.Z);
+            Assert.Equal(0, entity.PointZM.M);
         }
 
         protected virtual void ExecuteWithStrategyInTransaction(

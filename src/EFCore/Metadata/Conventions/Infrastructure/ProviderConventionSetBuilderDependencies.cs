@@ -1,11 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
@@ -116,6 +115,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure
         /// <summary>
         ///     The member classifier.
         /// </summary>
+        [EntityFrameworkInternal]
         public IMemberClassifier MemberClassifier { get; }
 
         /// <summary>
@@ -183,7 +183,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure
         /// </summary>
         /// <param name="validationLogger"> A replacement for the current dependency of this type. </param>
         /// <returns> A new parameter object with the given service replaced. </returns>
-        public ProviderConventionSetBuilderDependencies With([NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> validationLogger)
+        public ProviderConventionSetBuilderDependencies With(
+            [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> validationLogger)
             => new ProviderConventionSetBuilderDependencies(
                 TypeMappingSource, ConstructorBindingFactory, ParameterBindingFactories, MemberClassifier, Logger, validationLogger,
                 SetFinder, _currentContext, ModelValidator);
@@ -203,6 +204,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure
         /// </summary>
         /// <param name="memberClassifier"> A replacement for the current dependency of this type. </param>
         /// <returns> A new parameter object with the given service replaced. </returns>
+        [EntityFrameworkInternal]
         public ProviderConventionSetBuilderDependencies With([NotNull] IMemberClassifier memberClassifier)
             => new ProviderConventionSetBuilderDependencies(
                 TypeMappingSource, ConstructorBindingFactory, ParameterBindingFactories, memberClassifier, Logger, ValidationLogger,

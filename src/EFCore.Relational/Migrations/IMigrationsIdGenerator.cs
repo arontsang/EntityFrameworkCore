@@ -11,9 +11,9 @@ namespace Microsoft.EntityFrameworkCore.Migrations
     ///         A service for generating migration identifiers from names and names from identifiers.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/>. This means a single instance
-    ///         is used by many <see cref="DbContext"/> instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public interface IMigrationsIdGenerator
@@ -36,7 +36,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         ///     Checks whether or not the given string is a valid migration identifier.
         /// </summary>
         /// <param name="value"> The candidate string. </param>
-        /// <returns> <c>True</c> if the string is a valid migration identifier; <c>false</c> otherwise. </returns>
+        /// <returns> <see langword="true" /> if the string is a valid migration identifier; <see langword="false" /> otherwise. </returns>
         bool IsValidId([NotNull] string value);
     }
 }

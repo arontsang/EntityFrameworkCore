@@ -7,7 +7,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Metadata.Builders
@@ -75,11 +74,15 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Builders
         ///     If null or not specified, there is no navigation property on the other end of the relationship.
         /// </param>
         /// <returns> An object to further configure the relationship. </returns>
-        public new virtual ReferenceCollectionBuilder<TRelatedEntity, TEntity> WithMany([CanBeNull] string navigationName = null)
-            => new ReferenceCollectionBuilder<TRelatedEntity, TEntity>(
+        public new virtual ReferenceCollectionBuilder<TRelatedEntity, TEntity> WithMany(
+            [CanBeNull] string navigationName = null)
+        {
+            return new ReferenceCollectionBuilder<TRelatedEntity, TEntity>(
                 RelatedEntityType,
                 DeclaringEntityType,
-                WithManyBuilder(Check.NullButNotEmpty(navigationName, nameof(navigationName))).Metadata);
+                WithManyBuilder(
+                    Check.NullButNotEmpty(navigationName, nameof(navigationName))).Metadata);
+        }
 
         /// <summary>
         ///     <para>
@@ -99,14 +102,16 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Builders
         /// <returns> An object to further configure the relationship. </returns>
         public virtual ReferenceCollectionBuilder<TRelatedEntity, TEntity> WithMany(
             [CanBeNull] Expression<Func<TRelatedEntity, IEnumerable<TEntity>>> navigationExpression)
-            => new ReferenceCollectionBuilder<TRelatedEntity, TEntity>(
+        {
+            return new ReferenceCollectionBuilder<TRelatedEntity, TEntity>(
                 RelatedEntityType,
                 DeclaringEntityType,
-                WithManyBuilder(navigationExpression?.GetPropertyAccess()).Metadata);
+                WithManyBuilder(navigationExpression?.GetMemberAccess()).Metadata);
+        }
 
         /// <summary>
         ///     <para>
-        ///         Configures this as a one-to-many relationship.
+        ///         Configures this as a one-to-one relationship.
         ///     </para>
         ///     <para>
         ///         Note that calling this method with no parameters will explicitly configure this side
@@ -119,11 +124,13 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Builders
         ///     If null or not specified, there is no navigation property on the other end of the relationship.
         /// </param>
         /// <returns> An object to further configure the relationship. </returns>
-        public new virtual ReferenceReferenceBuilder<TEntity, TRelatedEntity> WithOne([CanBeNull] string navigationName = null)
+        public new virtual ReferenceReferenceBuilder<TEntity, TRelatedEntity> WithOne(
+            [CanBeNull] string navigationName = null)
             => new ReferenceReferenceBuilder<TEntity, TRelatedEntity>(
                 DeclaringEntityType,
                 RelatedEntityType,
-                WithOneBuilder(Check.NullButNotEmpty(navigationName, nameof(navigationName))).Metadata);
+                WithOneBuilder(
+                    Check.NullButNotEmpty(navigationName, nameof(navigationName))).Metadata);
 
         /// <summary>
         ///     <para>
@@ -146,6 +153,6 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Builders
             => new ReferenceReferenceBuilder<TEntity, TRelatedEntity>(
                 DeclaringEntityType,
                 RelatedEntityType,
-                WithOneBuilder(navigationExpression?.GetPropertyAccess()).Metadata);
+                WithOneBuilder(navigationExpression?.GetMemberAccess()).Metadata);
     }
 }

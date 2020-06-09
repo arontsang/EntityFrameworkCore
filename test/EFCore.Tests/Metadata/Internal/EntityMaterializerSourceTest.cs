@@ -8,6 +8,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Xunit;
 
@@ -144,10 +145,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                 = new FactoryMethodBinding(
                     TestProxyFactory.Instance,
                     typeof(TestProxyFactory).GetTypeInfo().GetDeclaredMethod(nameof(TestProxyFactory.Create)),
-                    new List<ParameterBinding>
-                    {
-                        new EntityTypeParameterBinding()
-                    },
+                    new List<ParameterBinding> { new EntityTypeParameterBinding() },
                     entityType.ClrType);
             ((Model)entityType.Model).FinalizeModel();
 
@@ -291,7 +289,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
 
             Assert.Equal(
                 CoreStrings.NoParameterlessConstructor(typeof(EntityWithoutParameterlessConstructor).Name),
-                Assert.Throws<InvalidOperationException>(() => GetMaterializer(new EntityMaterializerSource(new EntityMaterializerSourceDependencies()), entityType)).Message);
+                Assert.Throws<InvalidOperationException>(
+                    () => GetMaterializer(new EntityMaterializerSource(new EntityMaterializerSourceDependencies()), entityType)).Message);
         }
 
         private static readonly ParameterExpression _contextParameter
@@ -322,10 +321,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             }
 
             public static SomeEntity Factory(int id, Guid? goo)
-                => new SomeEntity(id, goo)
-                {
-                    FactoryUsed = true
-                };
+                => new SomeEntity(id, goo) { FactoryUsed = true };
 
             public static SomeEntity GeneralFactory(object[] constructorArguments)
             {

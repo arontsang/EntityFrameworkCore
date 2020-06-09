@@ -59,8 +59,8 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
             catch
             {
                 var methodCallLine = Environment.StackTrace.Split(
-                        new[] { _eol },
-                        StringSplitOptions.RemoveEmptyEntries)[3].Substring(6);
+                    new[] { _eol },
+                    StringSplitOptions.RemoveEmptyEntries)[3].Substring(6);
 
                 var testName = methodCallLine.Substring(0, methodCallLine.IndexOf(')') + 1);
                 var lineIndex = methodCallLine.LastIndexOf("line", StringComparison.Ordinal);
@@ -70,9 +70,9 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
 
                 var currentDirectory = Directory.GetCurrentDirectory();
                 var logFile = currentDirectory.Substring(
-                                  0,
-                                  currentDirectory.LastIndexOf("\\artifacts\\", StringComparison.Ordinal) + 1)
-                              + "QueryBaseline.cs";
+                        0,
+                        currentDirectory.LastIndexOf("\\artifacts\\", StringComparison.Ordinal) + 1)
+                    + "QueryBaseline.txt";
 
                 var testInfo = testName + " : " + lineNumber + FileNewLine;
 
@@ -117,15 +117,14 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
             protected override void UnsafeLog<TState>(
                 LogLevel logLevel, EventId eventId, string message, TState state, Exception exception)
             {
-                if (eventId.Id == CoreEventId.ProviderBaseId)
+                if (eventId.Id == CosmosEventId.ExecutingSqlQuery)
                 {
                     if (_shouldLogCommands)
                     {
                         base.UnsafeLog(logLevel, eventId, message, state, exception);
                     }
 
-                    if (message != null
-                        && eventId.Id == CoreEventId.ProviderBaseId)
+                    if (message != null)
                     {
                         var structure = (IReadOnlyList<KeyValuePair<string, object>>)state;
 
@@ -139,6 +138,22 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
                         }
 
                         SqlStatements.Add(parameters + commandText);
+                    }
+                }
+                if (eventId.Id == CosmosEventId.ExecutingReadItem)
+                {
+                    if (_shouldLogCommands)
+                    {
+                        base.UnsafeLog(logLevel, eventId, message, state, exception);
+                    }
+
+                    if (message != null)
+                    {
+                        var structure = (IReadOnlyList<KeyValuePair<string, object>>)state;
+
+                        var parameters = structure.Where(i => i.Key == "parameters").Select(i => (string)i.Value).First();
+
+                        SqlStatements.Add($"ReadItem({parameters})");
                     }
                 }
                 else

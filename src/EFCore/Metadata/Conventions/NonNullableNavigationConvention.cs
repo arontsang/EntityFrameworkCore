@@ -4,7 +4,6 @@
 using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -26,30 +25,25 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
         {
         }
 
-        /// <summary>
-        ///     Called after a navigation is added to the entity type.
-        /// </summary>
-        /// <param name="relationshipBuilder"> The builder for the foreign key. </param>
-        /// <param name="navigation"> The navigation. </param>
-        /// <param name="context"> Additional information associated with convention execution. </param>
+        /// <inheritdoc />
         public virtual void ProcessNavigationAdded(
-            IConventionRelationshipBuilder relationshipBuilder,
-            IConventionNavigation navigation,
-            IConventionContext<IConventionNavigation> context)
+            IConventionNavigationBuilder navigationBuilder,
+            IConventionContext<IConventionNavigationBuilder> context)
         {
-            Check.NotNull(relationshipBuilder, nameof(relationshipBuilder));
-            Check.NotNull(navigation, nameof(navigation));
+            var navigation = navigationBuilder.Metadata;
+            var foreignKey = navigation.ForeignKey;
+            var relationshipBuilder = foreignKey.Builder;
+            var modelBuilder = navigationBuilder.ModelBuilder;
 
-            var modelBuilder = relationshipBuilder.ModelBuilder;
-
-            if (!IsNonNullable(modelBuilder, navigation) || navigation.IsCollection())
+            if (!IsNonNullable(modelBuilder, navigation)
+                || navigation.IsCollection)
             {
                 return;
             }
 
-            if (!navigation.IsDependentToPrincipal())
+            if (!navigation.IsOnDependent)
             {
-                var inverse = navigation.FindInverse();
+                var inverse = navigation.Inverse;
                 if (inverse != null)
                 {
                     if (IsNonNullable(modelBuilder, inverse))
@@ -60,32 +54,35 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 }
 
                 if (!navigation.ForeignKey.IsUnique
-                    || relationshipBuilder.Metadata.GetPrincipalEndConfigurationSource() != null)
+                    || foreignKey.GetPrincipalEndConfigurationSource() != null)
+                {
+                    Dependencies.Logger.NonNullableReferenceOnDependent(navigation.ForeignKey.PrincipalToDependent);
+                    return;
+                }
+
+                relationshipBuilder = relationshipBuilder.HasEntityTypes(
+                    foreignKey.DeclaringEntityType,
+                    foreignKey.PrincipalEntityType);
+
+                if (relationshipBuilder == null)
                 {
                     return;
                 }
 
-                var newRelationshipBuilder = relationshipBuilder.HasEntityTypes(
-                    relationshipBuilder.Metadata.DeclaringEntityType,
-                    relationshipBuilder.Metadata.PrincipalEntityType);
-
-                if (newRelationshipBuilder == null)
-                {
-                    return;
-                }
-
-                Dependencies.Logger.NonNullableOnDependent(newRelationshipBuilder.Metadata.DependentToPrincipal);
-                relationshipBuilder = newRelationshipBuilder;
+                Dependencies.Logger.NonNullableInverted(relationshipBuilder.Metadata.DependentToPrincipal);
             }
 
-            relationshipBuilder.IsRequired(true);
+            relationshipBuilder = relationshipBuilder.IsRequired(true);
 
-            context.StopProcessingIfChanged(relationshipBuilder.Metadata.DependentToPrincipal);
+            if (relationshipBuilder != null)
+            {
+                context.StopProcessingIfChanged(relationshipBuilder.Metadata.DependentToPrincipal?.Builder);
+            }
         }
 
         private bool IsNonNullable(IConventionModelBuilder modelBuilder, IConventionNavigation navigation)
             => navigation.DeclaringEntityType.HasClrType()
-               && navigation.DeclaringEntityType.GetRuntimeProperties().Find(navigation.Name) is PropertyInfo propertyInfo
-               && IsNonNullable(modelBuilder, propertyInfo);
+                && navigation.DeclaringEntityType.GetRuntimeProperties().Find(navigation.Name) is PropertyInfo propertyInfo
+                && IsNonNullableReferenceType(modelBuilder, propertyInfo);
     }
 }

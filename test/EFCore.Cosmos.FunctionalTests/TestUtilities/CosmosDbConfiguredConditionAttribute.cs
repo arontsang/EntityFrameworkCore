@@ -4,6 +4,7 @@
 using System;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.TestUtilities.Xunit;
 
@@ -12,9 +13,20 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class | AttributeTargets.Assembly)]
     public class CosmosDbConfiguredConditionAttribute : Attribute, ITestCondition
     {
-        private static bool? _connectionAvailable;
+        public string SkipReason
+#if NETCOREAPP3_1
+            => "Cosmos tests don't run on .NET Core 3.1";
+#else
+            => "Unable to connect to Cosmos DB. Please install/start the emulator service or configure a valid endpoint.";
+#endif
 
-        public string SkipReason => "Unable to connect to CosmosDb Emulator. Please install/start emulator service.";
+#if NETCOREAPP3_1
+        public ValueTask<bool> IsMetAsync()
+        {
+            return new ValueTask<bool>(false);
+        }
+#else
+        private static bool? _connectionAvailable;
 
         public async ValueTask<bool> IsMetAsync()
         {
@@ -25,6 +37,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
 
             return _connectionAvailable.Value;
         }
+#endif
 
         private static async Task<bool> TryConnectAsync()
         {
@@ -37,7 +50,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
             }
             catch (AggregateException aggregate)
             {
-                if (aggregate.Flatten().InnerExceptions.Any(e => IsNotConfigured(e)))
+                if (aggregate.Flatten().InnerExceptions.Any(IsNotConfigured))
                 {
                     return false;
                 }
@@ -62,17 +75,13 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.TestUtilities
             }
         }
 
-        private static bool IsNotConfigured(Exception firstException)
-        {
-            switch (firstException)
+        private static bool IsNotConfigured(Exception exception)
+            => exception switch
             {
-                case HttpRequestException re:
-                    return true;
-                case Exception e:
-                    return e.Message.StartsWith("The input authorization token can't serve the request. Please check that the expected payload is built as per the protocol, and check the key being used.");
-                default:
-                    return false;
-            }
-        }
+                HttpRequestException re => re.InnerException is SocketException,
+                _ => exception.Message.Contains(
+                    "The input authorization token can't serve the request. Please check that the expected payload is built as per the protocol, and check the key being used.",
+                    StringComparison.Ordinal),
+            };
     }
 }

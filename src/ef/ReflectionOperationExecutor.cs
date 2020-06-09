@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -6,8 +6,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using Microsoft.EntityFrameworkCore.Tools.Properties;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Tools.Properties;
 
 namespace Microsoft.EntityFrameworkCore.Tools
 {
@@ -25,8 +25,9 @@ namespace Microsoft.EntityFrameworkCore.Tools
             string projectDir,
             string dataDirectory,
             string rootNamespace,
-            string language)
-            : base(assembly, startupAssembly, projectDir, rootNamespace, language)
+            string language,
+            string[] remainingArguments)
+            : base(assembly, startupAssembly, projectDir, rootNamespace, language, remainingArguments)
         {
             if (dataDirectory != null)
             {
@@ -49,14 +50,15 @@ namespace Microsoft.EntityFrameworkCore.Tools
             _executor = Activator.CreateInstance(
                 _commandsAssembly.GetType(ExecutorTypeName, throwOnError: true, ignoreCase: false),
                 reportHandler,
-                new Dictionary<string, string>
+                new Dictionary<string, object>
                 {
                     { "targetName", AssemblyFileName },
                     { "startupTargetName", StartupAssemblyFileName },
                     { "projectDir", ProjectDirectory },
                     { "rootNamespace", RootNamespace },
                     { "language", Language },
-                    { "toolsVersion", ProductInfo.GetVersion() }
+                    { "toolsVersion", ProductInfo.GetVersion() },
+                    { "remainingArguments", RemainingArguments }
                 });
 
             _resultHandlerType = _commandsAssembly.GetType(ResultHandlerTypeName, throwOnError: true, ignoreCase: false);

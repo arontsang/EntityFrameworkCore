@@ -1,10 +1,12 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
+using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
 {
@@ -24,7 +26,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public EqualsTranslator(ISqlExpressionFactory sqlExpressionFactory)
+        public EqualsTranslator([NotNull] ISqlExpressionFactory sqlExpressionFactory)
         {
             _sqlExpressionFactory = sqlExpressionFactory;
         }
@@ -37,6 +39,9 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         /// </summary>
         public virtual SqlExpression Translate(SqlExpression instance, MethodInfo method, IReadOnlyList<SqlExpression> arguments)
         {
+            Check.NotNull(method, nameof(method));
+            Check.NotNull(arguments, nameof(arguments));
+
             SqlExpression left = null;
             SqlExpression right = null;
 
@@ -45,16 +50,18 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
                 && arguments.Count == 1)
             {
                 left = instance;
-                right = RemoveObjectConvert(arguments[0]);
+                right = arguments[0];
             }
-            else if (method.Name == nameof(object.Equals)
-                && arguments.Count == 2)
+            else if (instance == null
+                     && method.Name == nameof(object.Equals)
+                     && arguments.Count == 2)
             {
-                left = RemoveObjectConvert(arguments[0]);
-                right = RemoveObjectConvert(arguments[1]);
+                left = arguments[0];
+                right = arguments[1];
             }
 
-            if (left != null && right != null)
+            if (left != null
+                && right != null)
             {
                 return left.Type.UnwrapNullableType() == right.Type.UnwrapNullableType()
                     ? (SqlExpression)_sqlExpressionFactory.Equal(left, right)
@@ -62,18 +69,6 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
             }
 
             return null;
-        }
-
-        private SqlExpression RemoveObjectConvert(SqlExpression expression)
-        {
-            if (expression is SqlUnaryExpression sqlUnaryExpression
-                && sqlUnaryExpression.OperatorType == ExpressionType.Convert
-                && sqlUnaryExpression.Type == typeof(object))
-            {
-                return sqlUnaryExpression.Operand;
-            }
-
-            return expression;
         }
     }
 }

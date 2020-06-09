@@ -1,10 +1,13 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Linq.Expressions;
+using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Cosmos.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
 {
@@ -14,7 +17,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public class ObjectAccessExpression : Expression, IPrintable, IAccessExpression
+    public class ObjectAccessExpression : Expression, IPrintableExpression, IAccessExpression
     {
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -22,18 +25,27 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public ObjectAccessExpression(INavigation navigation, Expression accessExpression)
+        public ObjectAccessExpression([NotNull] INavigation navigation, [NotNull] Expression accessExpression)
         {
-            Name = navigation.GetTargetType().GetCosmosContainingPropertyName();
+            Name = navigation.TargetEntityType.GetContainingPropertyName();
             if (Name == null)
             {
                 throw new InvalidOperationException(
-                    $"Navigation '{navigation.DeclaringEntityType.DisplayName()}.{navigation.Name}' doesn't point to a nested entity.");
+                    CosmosStrings.NavigationPropertyIsNotAnEmbeddedEntity(
+                        navigation.DeclaringEntityType.DisplayName(), navigation.Name));
             }
 
             Navigation = navigation;
             AccessExpression = accessExpression;
         }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public override ExpressionType NodeType => ExpressionType.Extension;
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -75,9 +87,9 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         /// </summary>
         protected override Expression VisitChildren(ExpressionVisitor visitor)
         {
-            var outerExpression = visitor.Visit(AccessExpression);
+            Check.NotNull(visitor, nameof(visitor));
 
-            return Update(outerExpression);
+            return Update(visitor.Visit(AccessExpression));
         }
 
         /// <summary>
@@ -86,7 +98,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual ObjectAccessExpression Update(Expression outerExpression)
+        public virtual ObjectAccessExpression Update([NotNull] Expression outerExpression)
             => outerExpression != AccessExpression
                 ? new ObjectAccessExpression(Navigation, outerExpression)
                 : this;
@@ -97,7 +109,12 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void Print(ExpressionPrinter expressionPrinter) => expressionPrinter.StringBuilder.Append(ToString());
+        void IPrintableExpression.Print(ExpressionPrinter expressionPrinter)
+        {
+            Check.NotNull(expressionPrinter, nameof(expressionPrinter));
+
+            expressionPrinter.Append(ToString());
+        }
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -115,9 +132,9 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         /// </summary>
         public override bool Equals(object obj)
             => obj != null
-            && (ReferenceEquals(this, obj)
-                || obj is ObjectAccessExpression objectAccessExpression
-                    && Equals(objectAccessExpression));
+               && (ReferenceEquals(this, obj)
+                   || obj is ObjectAccessExpression objectAccessExpression
+                   && Equals(objectAccessExpression));
 
         private bool Equals(ObjectAccessExpression objectAccessExpression)
             => Navigation == objectAccessExpression.Navigation

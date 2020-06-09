@@ -28,8 +28,8 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -44,9 +44,6 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         private IIdentityMap _identityMap1;
         private Dictionary<IKey, IIdentityMap> _identityMaps;
         private bool _needsUnsubscribe;
-        private bool _queryIsTracked;
-        private TrackingQueryMode _trackingQueryMode = TrackingQueryMode.Simple;
-        private IEntityType _singleQueryModeEntityType;
 
         private readonly IDiagnosticsLogger<DbLoggerCategory.ChangeTracking> _changeTrackingLogger;
         private readonly IInternalEntityEntryFactory _internalEntityEntryFactory;
@@ -73,7 +70,8 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             _database = dependencies.Database;
             _concurrencyDetector = dependencies.ConcurrencyDetector;
             Context = dependencies.CurrentContext.Context;
-            EntityFinderFactory = new EntityFinderFactory(dependencies.EntityFinderSource, this, dependencies.SetSource, dependencies.CurrentContext.Context);
+            EntityFinderFactory = new EntityFinderFactory(
+                dependencies.EntityFinderSource, this, dependencies.SetSource, dependencies.CurrentContext.Context);
             EntityMaterializerSource = dependencies.EntityMaterializerSource;
 
             if (dependencies.LoggingOptions.IsSensitiveDataLoggingEnabled)
@@ -115,23 +113,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual TrackingQueryMode GetTrackingQueryMode(IEntityType entityType)
-        {
-            if (_trackingQueryMode == TrackingQueryMode.Simple
-                && _singleQueryModeEntityType != entityType)
-            {
-                // Drop out if SQM for change of entity type or self-refs since query may not fix them up.
-                if (_singleQueryModeEntityType != null
-                    || entityType.GetNavigations().Any(n => entityType.IsSameHierarchy(n.GetTargetType())))
-                {
-                    _trackingQueryMode = TrackingQueryMode.Single;
-                }
-
-                _singleQueryModeEntityType = entityType;
-            }
-
-            return _trackingQueryMode;
-        }
+        public virtual CascadeTiming DeleteOrphansTiming { get; set; } = CascadeTiming.Immediate;
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -139,7 +121,15 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void EndSingleQueryMode() => _trackingQueryMode = TrackingQueryMode.Multiple;
+        public virtual CascadeTiming CascadeDeleteTiming { get; set; } = CascadeTiming.Immediate;
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual bool SavingChanges { get; set; }
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -213,8 +203,6 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             var entry = TryGetEntry(entity);
             if (entry == null)
             {
-                _trackingQueryMode = TrackingQueryMode.Multiple;
-
                 var entityType = _model.FindRuntimeEntityType(entity.GetType());
                 if (entityType == null)
                 {
@@ -224,8 +212,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
                             CoreStrings.UntrackedDependentEntity(
                                 entity.GetType().ShortDisplayName(),
                                 "." + nameof(EntityEntry.Reference) + "()." + nameof(ReferenceEntry.TargetEntry),
-                                "." + nameof(EntityEntry.Collection) + "()." + nameof(CollectionEntry.FindEntry) +
-                                "()"));
+                                "." + nameof(EntityEntry.Collection) + "()." + nameof(CollectionEntry.FindEntry) + "()"));
                     }
 
                     throw new InvalidOperationException(CoreStrings.EntityTypeNotFound(entity.GetType().ShortDisplayName()));
@@ -255,16 +242,16 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             var entry = TryGetEntry(entity, entityType);
             if (entry == null)
             {
-                _trackingQueryMode = TrackingQueryMode.Multiple;
-
                 var runtimeEntityType = _model.FindRuntimeEntityType(entity.GetType());
                 if (runtimeEntityType != null)
                 {
                     if (!entityType.IsAssignableFrom(runtimeEntityType))
                     {
-                        throw new InvalidOperationException(CoreStrings.TrackingTypeMismatch(
-                            runtimeEntityType.DisplayName(), entityType.DisplayName()));
+                        throw new InvalidOperationException(
+                            CoreStrings.TrackingTypeMismatch(
+                                runtimeEntityType.DisplayName(), entityType.DisplayName()));
                     }
+
                     entityType = runtimeEntityType;
                 }
 
@@ -289,9 +276,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         /// </summary>
         public virtual InternalEntityEntry CreateEntry(IDictionary<string, object> values, IEntityType entityType)
         {
-            _trackingQueryMode = TrackingQueryMode.Multiple;
-
-            var (i, j) = (0, 0);
+            var i = 0;
             var valuesArray = new object[entityType.PropertyCount()];
             var shadowPropertyValuesArray = new object[entityType.ShadowPropertyCount()];
             foreach (var property in entityType.GetProperties())
@@ -302,7 +287,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
 
                 if (property.IsShadowProperty())
                 {
-                    shadowPropertyValuesArray[j++] = values.TryGetValue(property.Name, out var shadowValue)
+                    shadowPropertyValuesArray[property.GetShadowIndex()] = values.TryGetValue(property.Name, out var shadowValue)
                         ? shadowValue
                         : property.ClrType.GetDefaultValue();
                 }
@@ -347,29 +332,10 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void BeginTrackingQuery()
-        {
-            if (_queryIsTracked)
-            {
-                _trackingQueryMode = TrackingQueryMode.Multiple;
-            }
-            else
-            {
-                _queryIsTracked = true;
-            }
-        }
-
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
         public virtual InternalEntityEntry StartTrackingFromQuery(
             IEntityType baseEntityType,
             object entity,
-            in ValueBuffer valueBuffer,
-            ISet<IForeignKey> handledForeignKeys)
+            in ValueBuffer valueBuffer)
         {
             var existingEntry = TryGetEntry(entity);
             if (existingEntry != null)
@@ -379,9 +345,9 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
 
             var clrType = entity.GetType();
             var entityType = baseEntityType.ClrType == clrType
-                             || baseEntityType.HasDefiningNavigation()
-                ? baseEntityType
-                : _model.FindRuntimeEntityType(clrType);
+                || baseEntityType.HasDefiningNavigation()
+                    ? baseEntityType
+                    : _model.FindRuntimeEntityType(clrType);
 
             var newEntry = valueBuffer.IsEmpty
                 ? _internalEntityEntryFactory.Create(this, entityType, entity)
@@ -394,7 +360,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
 
             UpdateReferenceMaps(newEntry, EntityState.Unchanged, null);
 
-            newEntry.MarkUnchangedFromQuery(handledForeignKeys);
+            newEntry.MarkUnchangedFromQuery();
 
             if (_internalEntityEntrySubscriber.SnapshotAndSubscribe(newEntry))
             {
@@ -447,13 +413,12 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             {
                 if (throwOnTypeMismatch)
                 {
-                    throw new InvalidOperationException(CoreStrings.TrackingTypeMismatch(
-                        entry.EntityType.DisplayName(), entityType.DisplayName()));
+                    throw new InvalidOperationException(
+                        CoreStrings.TrackingTypeMismatch(
+                            entry.EntityType.DisplayName(), entityType.DisplayName()));
                 }
-                else
-                {
-                    return null;
-                }
+
+                return null;
             }
 
             return found ? entry : null;
@@ -521,9 +486,9 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             }
 
             return _identityMaps == null
-                   || !_identityMaps.TryGetValue(key, out var identityMap)
-                ? null
-                : identityMap;
+                || !_identityMaps.TryGetValue(key, out var identityMap)
+                    ? null
+                    : identityMap;
         }
 
         /// <summary>
@@ -639,13 +604,9 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
 
             if (_referencedUntrackedEntities != null)
             {
-                var navigations = entityType.GetNavigations().ToList();
-
                 foreach (var keyValuePair in _referencedUntrackedEntities.ToList())
                 {
-                    var untrackedEntityType = _model.FindRuntimeEntityType(keyValuePair.Key.GetType());
-                    if (navigations.Any(n => n.GetTargetType().IsAssignableFrom(untrackedEntityType))
-                        || untrackedEntityType.GetNavigations().Any(n => n.GetTargetType().IsAssignableFrom(entityType)))
+                    if (keyValuePair.Value.Any(t => t.Item2 == entry))
                     {
                         _referencedUntrackedEntities.Remove(keyValuePair.Key);
 
@@ -685,6 +646,20 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         /// </summary>
         public virtual void ResetState()
         {
+            Clear();
+
+            Tracked = null;
+            StateChanged = null;
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual void Clear()
+        {
             Unsubscribe();
             ChangedCount = 0;
             _entityReferenceMap.Clear();
@@ -695,12 +670,8 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             _identityMap1?.Clear();
 
             _needsUnsubscribe = false;
-            _queryIsTracked = false;
-            _trackingQueryMode = TrackingQueryMode.Simple;
-            _singleQueryModeEntityType = null;
 
-            Tracked = null;
-            StateChanged = null;
+            SavingChanges = false;
         }
 
         /// <summary>
@@ -729,7 +700,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             if (_referencedUntrackedEntities == null)
             {
                 _referencedUntrackedEntities
-                    = new Dictionary<object, IList<Tuple<INavigation, InternalEntityEntry>>>(ReferenceEqualityComparer.Instance);
+                    = new Dictionary<object, IList<Tuple<INavigation, InternalEntityEntry>>>(LegacyReferenceEqualityComparer.Instance);
             }
 
             if (!_referencedUntrackedEntities.TryGetValue(referencedEntity, out var danglers))
@@ -803,12 +774,13 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
                 FindIdentityMap(foreignKey.PrincipalKey)
                     ?.TryGetEntryUsingRelationshipSnapshot(foreignKey, dependentEntry));
 
-        private static InternalEntityEntry FilterIncompatiblePrincipal(IForeignKey foreignKey,
+        private static InternalEntityEntry FilterIncompatiblePrincipal(
+            IForeignKey foreignKey,
             InternalEntityEntry principalEntry)
             => principalEntry != null
-               && foreignKey.PrincipalEntityType.IsAssignableFrom(principalEntry.EntityType)
-                ? principalEntry
-                : null;
+                && foreignKey.PrincipalEntityType.IsAssignableFrom(principalEntry.EntityType)
+                    ? principalEntry
+                    : null;
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -857,13 +829,13 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual IEnumerable<InternalEntityEntry> GetDependents(
-            InternalEntityEntry principalEntry, IForeignKey foreignKey)
+        public virtual IEnumerable<IUpdateEntry> GetDependents(
+            IUpdateEntry principalEntry, IForeignKey foreignKey)
         {
             var dependentIdentityMap = FindIdentityMap(foreignKey.DeclaringEntityType.FindPrimaryKey());
             return dependentIdentityMap != null
                 ? dependentIdentityMap.GetDependentsMap(foreignKey).GetDependents(principalEntry)
-                : Enumerable.Empty<InternalEntityEntry>();
+                : Enumerable.Empty<IUpdateEntry>();
         }
 
         /// <summary>
@@ -872,13 +844,13 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual IEnumerable<InternalEntityEntry> GetDependentsUsingRelationshipSnapshot(
-            InternalEntityEntry principalEntry, IForeignKey foreignKey)
+        public virtual IEnumerable<IUpdateEntry> GetDependentsUsingRelationshipSnapshot(
+            IUpdateEntry principalEntry, IForeignKey foreignKey)
         {
             var dependentIdentityMap = FindIdentityMap(foreignKey.DeclaringEntityType.FindPrimaryKey());
             return dependentIdentityMap != null
                 ? dependentIdentityMap.GetDependentsMap(foreignKey).GetDependentsUsingRelationshipSnapshot(principalEntry)
-                : Enumerable.Empty<InternalEntityEntry>();
+                : Enumerable.Empty<IUpdateEntry>();
         }
 
         /// <summary>
@@ -887,15 +859,17 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual IEnumerable<InternalEntityEntry> GetDependentsFromNavigation(InternalEntityEntry principalEntry, IForeignKey foreignKey)
+        public virtual IEnumerable<IUpdateEntry> GetDependentsFromNavigation(
+            IUpdateEntry principalEntry, IForeignKey foreignKey)
         {
             var navigation = foreignKey.PrincipalToDependent;
-            if (navigation == null)
+            if (navigation == null
+                || navigation.IsShadowProperty())
             {
                 return null;
             }
 
-            var navigationValue = principalEntry[navigation];
+            var navigationValue = ((InternalEntityEntry)principalEntry)[navigation];
             if (navigationValue == null)
             {
                 return Enumerable.Empty<InternalEntityEntry>();
@@ -937,50 +911,12 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual int SaveChanges(bool acceptAllChangesOnSuccess)
+        public virtual IList<IUpdateEntry> GetEntriesToSave(bool cascadeChanges)
         {
-            if (ChangedCount == 0)
+            if (cascadeChanges)
             {
-                return 0;
+                CascadeChanges(force: false);
             }
-
-            var entriesToSave = GetEntriesToSave();
-            if (entriesToSave.Count == 0)
-            {
-                return 0;
-            }
-
-            try
-            {
-                var result = SaveChanges(entriesToSave);
-
-                if (acceptAllChangesOnSuccess)
-                {
-                    AcceptAllChanges((IReadOnlyList<IUpdateEntry>)entriesToSave);
-                }
-
-                return result;
-            }
-            catch
-            {
-                foreach (var entry in entriesToSave)
-                {
-                    ((InternalEntityEntry)entry).DiscardStoreGeneratedValues();
-                }
-
-                throw;
-            }
-        }
-
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
-        public virtual IList<IUpdateEntry> GetEntriesToSave()
-        {
-            CascadeChanges(force: false);
 
             var toSave = new List<IUpdateEntry>(GetCountForState(added: true, modified: true, deleted: true));
 
@@ -1031,28 +967,35 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual void CascadeDelete(InternalEntityEntry entry, bool force)
+        public virtual void CascadeDelete(InternalEntityEntry entry, bool force, IEnumerable<IForeignKey> foreignKeys = null)
         {
-            var doCascadeDelete = force || Context.ChangeTracker.CascadeDeleteTiming != CascadeTiming.Never;
+            var doCascadeDelete = force || CascadeDeleteTiming != CascadeTiming.Never;
+            var principalIsDetached = entry.EntityState == EntityState.Detached;
 
-            foreach (var fk in entry.EntityType.GetReferencingForeignKeys())
+            foreignKeys ??= entry.EntityType.GetReferencingForeignKeys();
+            foreach (var fk in foreignKeys)
             {
-                foreach (var dependent in (GetDependentsFromNavigation(entry, fk)
-                                           ?? GetDependents(entry, fk)).ToList())
+                if (fk.DeleteBehavior == DeleteBehavior.ClientNoAction)
+                {
+                    continue;
+                }
+
+                foreach (InternalEntityEntry dependent in (GetDependentsFromNavigation(entry, fk)
+                    ?? GetDependents(entry, fk)).ToList())
                 {
                     if (dependent.EntityState != EntityState.Deleted
                         && dependent.EntityState != EntityState.Detached
-                        && fk.DeleteBehavior != DeleteBehavior.ClientNoAction
                         && (dependent.EntityState == EntityState.Added
                             || KeysEqual(entry, fk, dependent)))
                     {
                         if ((fk.DeleteBehavior == DeleteBehavior.Cascade
-                             || fk.DeleteBehavior == DeleteBehavior.ClientCascade)
+                                || fk.DeleteBehavior == DeleteBehavior.ClientCascade)
                             && doCascadeDelete)
                         {
-                            var cascadeState = dependent.EntityState == EntityState.Added
-                                ? EntityState.Detached
-                                : EntityState.Deleted;
+                            var cascadeState = principalIsDetached
+                                || dependent.EntityState == EntityState.Added
+                                    ? EntityState.Detached
+                                    : EntityState.Deleted;
 
                             if (SensitiveLoggingEnabled)
                             {
@@ -1067,11 +1010,12 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
 
                             CascadeDelete(dependent, force);
                         }
-                        else
+                        else if (!principalIsDetached)
                         {
                             foreach (var dependentProperty in fk.Properties)
                             {
-                                dependent.SetProperty(dependentProperty, null, setModified: true, isCascadeDelete: true);
+                                dependent.SetProperty(
+                                    dependentProperty, null, isMaterialization: false, setModified: true, isCascadeDelete: true);
                             }
 
                             if (dependent.HasConceptualNull)
@@ -1104,52 +1048,9 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         }
 
         private static bool KeyValuesEqual(IProperty property, object value, object currentValue)
-            => (property.GetKeyValueComparer()
-                ?? property.GetTypeMapping().KeyComparer)
-               ?.Equals(currentValue, value)
-               ?? Equals(currentValue, value);
-
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
-        public virtual async Task<int> SaveChangesAsync(
-            bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
-        {
-            if (ChangedCount == 0)
-            {
-                return 0;
-            }
-
-            var entriesToSave = GetEntriesToSave();
-            if (entriesToSave.Count == 0)
-            {
-                return 0;
-            }
-
-            try
-            {
-                var result = await SaveChangesAsync(entriesToSave, cancellationToken);
-
-                if (acceptAllChangesOnSuccess)
-                {
-                    AcceptAllChanges((IReadOnlyList<IUpdateEntry>)entriesToSave);
-                }
-
-                return result;
-            }
-            catch
-            {
-                foreach (var entry in entriesToSave)
-                {
-                    ((InternalEntityEntry)entry).DiscardStoreGeneratedValues();
-                }
-
-                throw;
-            }
-        }
+            => (property.GetKeyValueComparer())
+                ?.Equals(currentValue, value)
+                ?? Equals(currentValue, value);
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -1178,7 +1079,113 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         {
             using (_concurrencyDetector.EnterCriticalSection())
             {
-                return await _database.SaveChangesAsync(entriesToSave, cancellationToken);
+                return await _database.SaveChangesAsync(entriesToSave, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual int SaveChanges(bool acceptAllChangesOnSuccess)
+            => Context.Database.AutoTransactionsEnabled
+                ? Dependencies.ExecutionStrategyFactory.Create().Execute(acceptAllChangesOnSuccess, SaveChanges, null)
+                : SaveChanges(Context, acceptAllChangesOnSuccess);
+
+        private int SaveChanges(DbContext _, bool acceptAllChangesOnSuccess)
+        {
+            if (ChangedCount == 0)
+            {
+                return 0;
+            }
+
+            var entriesToSave = GetEntriesToSave(cascadeChanges: true);
+            if (entriesToSave.Count == 0)
+            {
+                return 0;
+            }
+
+            try
+            {
+                SavingChanges = true;
+                var result = SaveChanges(entriesToSave);
+
+                if (acceptAllChangesOnSuccess)
+                {
+                    AcceptAllChanges((IReadOnlyList<IUpdateEntry>)entriesToSave);
+                }
+
+                return result;
+            }
+            catch
+            {
+                foreach (var entry in entriesToSave)
+                {
+                    ((InternalEntityEntry)entry).DiscardStoreGeneratedValues();
+                }
+
+                throw;
+            }
+            finally
+            {
+                SavingChanges = false;
+            }
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+            => Context.Database.AutoTransactionsEnabled
+                ? Dependencies.ExecutionStrategyFactory.Create().ExecuteAsync(acceptAllChangesOnSuccess, SaveChangesAsync, null, cancellationToken)
+                : SaveChangesAsync(Context, acceptAllChangesOnSuccess, cancellationToken);
+
+        private async Task<int> SaveChangesAsync(
+            DbContext _, bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+        {
+            if (ChangedCount == 0)
+            {
+                return 0;
+            }
+
+            var entriesToSave = GetEntriesToSave(cascadeChanges: true);
+            if (entriesToSave.Count == 0)
+            {
+                return 0;
+            }
+
+            try
+            {
+                SavingChanges = true;
+                var result = await SaveChangesAsync(entriesToSave, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (acceptAllChangesOnSuccess)
+                {
+                    AcceptAllChanges((IReadOnlyList<IUpdateEntry>)entriesToSave);
+                }
+
+                return result;
+            }
+            catch
+            {
+                foreach (var entry in entriesToSave)
+                {
+                    ((InternalEntityEntry)entry).DiscardStoreGeneratedValues();
+                }
+
+                throw;
+            }
+            finally
+            {
+                SavingChanges = false;
             }
         }
 

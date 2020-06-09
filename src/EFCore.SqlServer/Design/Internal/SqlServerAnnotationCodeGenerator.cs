@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using JetBrains.Annotations;
@@ -46,7 +46,7 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Design.Internal
             }
 
             return annotation.Name == SqlServerAnnotationNames.ValueGenerationStrategy
-                   && (SqlServerValueGenerationStrategy)annotation.Value == SqlServerValueGenerationStrategy.IdentityColumn;
+                && (SqlServerValueGenerationStrategy)annotation.Value == SqlServerValueGenerationStrategy.IdentityColumn;
         }
 
         /// <summary>
@@ -80,6 +80,11 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Design.Internal
             if (annotation.Name == SqlServerAnnotationNames.Include)
             {
                 return new MethodCallCodeFragment(nameof(SqlServerIndexBuilderExtensions.IncludeProperties), annotation.Value);
+            }
+
+            if (annotation.Name == SqlServerAnnotationNames.FillFactor)
+            { 
+                return new MethodCallCodeFragment(nameof(SqlServerIndexBuilderExtensions.HasFillFactor), annotation.Value);
             }
 
             return null;

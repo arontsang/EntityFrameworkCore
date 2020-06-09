@@ -33,6 +33,12 @@ Register-TabExpansion Add-Migration @{
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
 
+.PARAMETER Namespace
+    Specify to override the namespace for the migration.
+
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
+
 .LINK
     Remove-Migration
     Update-Database
@@ -47,7 +53,10 @@ function Add-Migration
         [string] $OutputDir,
         [string] $Context,
         [string] $Project,
-        [string] $StartupProject)
+        [string] $StartupProject,
+        [string] $Namespace,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     WarnIfEF6 'Add-Migration'
 
@@ -61,11 +70,21 @@ function Add-Migration
         $params += '--output-dir', $OutputDir
     }
 
+    if ($Namespace)
+    {
+        $params += '--namespace', $Namespace
+    }
+
     $params += GetParams $Context
+
+    if ($RemainingArguments -ne $null)
+    {
+        $params += $RemainingArguments
+    }
 
     # NB: -join is here to support ConvertFrom-Json on PowerShell 3.0
     $result = (EF $dteProject $dteStartupProject $params) -join "`n" | ConvertFrom-Json
-    Write-Output 'To undo this action, use Remove-Migration.'
+    Write-Host 'To undo this action, use Remove-Migration.'
 
     $dteProject.ProjectItems.AddFromFile($result.migrationFile) | Out-Null
     $DTE.ItemOperations.OpenFile($result.migrationFile) | Out-Null
@@ -102,6 +121,9 @@ Register-TabExpansion Drop-Database @{
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
 
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
+
 .LINK
     Update-Database
     about_EntityFrameworkCore
@@ -109,7 +131,12 @@ Register-TabExpansion Drop-Database @{
 function Drop-Database
 {
     [CmdletBinding(PositionalBinding = $false, SupportsShouldProcess = $true, ConfirmImpact = 'High')]
-    param([string] $Context, [string] $Project, [string] $StartupProject)
+    param(
+        [string] $Context,
+        [string] $Project,
+        [string] $StartupProject,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     $dteProject = GetProject $Project
     $dteStartupProject = GetStartupProject $StartupProject $dteProject
@@ -120,6 +147,11 @@ function Drop-Database
     {
         $params = 'database', 'drop', '--force'
         $params += GetParams $Context
+
+       if ($RemainingArguments -ne $null)
+       {
+           $params += $RemainingArguments
+       }
 
         EF $dteProject $dteStartupProject $params -skipBuild
     }
@@ -161,21 +193,35 @@ Register-TabExpansion Get-DbContext @{
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
 
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
+
 .LINK
     about_EntityFrameworkCore
 #>
 function Get-DbContext
 {
     [CmdletBinding(PositionalBinding = $false)]
-    param([string] $Context, [string] $Project, [string] $StartupProject)
+    param(
+        [string] $Context,
+        [string] $Project,
+        [string] $StartupProject,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     $dteProject = GetProject $Project
     $dteStartupProject = GetStartupProject $StartupProject $dteProject
 
-    if ($Context)
+    if ($PSBoundParameters.ContainsKey('Context'))
     {
        $params = 'dbcontext', 'info', '--json'
        $params += GetParams $Context
+
+       if ($RemainingArguments -ne $null)
+       {
+           $params += $RemainingArguments
+       }
+
        # NB: -join is here to support ConvertFrom-Json on PowerShell 3.0
        return (EF $dteProject $dteStartupProject $params) -join "`n" | ConvertFrom-Json
     }
@@ -216,6 +262,9 @@ Register-TabExpansion Remove-Migration @{
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
 
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
+
 .LINK
     Add-Migration
     about_EntityFrameworkCore
@@ -223,7 +272,13 @@ Register-TabExpansion Remove-Migration @{
 function Remove-Migration
 {
     [CmdletBinding(PositionalBinding = $false)]
-    param([switch] $Force, [string] $Context, [string] $Project, [string] $StartupProject)
+    param(
+        [switch] $Force,
+        [string] $Context,
+        [string] $Project,
+        [string] $StartupProject,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     $dteProject = GetProject $Project
     $dteStartupProject = GetStartupProject $StartupProject $dteProject
@@ -236,6 +291,11 @@ function Remove-Migration
     }
 
     $params += GetParams $Context
+
+    if ($RemainingArguments -ne $null)
+    {
+        $params += $RemainingArguments
+    }
 
     # NB: -join is here to support ConvertFrom-Json on PowerShell 3.0
     $result = (EF $dteProject $dteStartupProject $params) -join "`n" | ConvertFrom-Json
@@ -299,11 +359,23 @@ Register-TabExpansion Scaffold-DbContext @{
 .PARAMETER Force
     Overwrite existing files.
 
+.PARAMETER NoOnConfiguring
+    Suppress generation of the DbContext.OnConfiguring() method.
+
 .PARAMETER Project
     The project to use.
 
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
+
+.PARAMETER Namespace
+    Specify to override the namespace for the generated entity types.
+
+.PARAMETER ContextNamespace
+    Specify to override the namespace for the DbContext class.
+
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
 
 .LINK
     about_EntityFrameworkCore
@@ -324,8 +396,13 @@ function Scaffold-DbContext
         [switch] $DataAnnotations,
         [switch] $UseDatabaseNames,
         [switch] $Force,
+        [switch] $NoOnConfiguring,
         [string] $Project,
-        [string] $StartupProject)
+        [string] $StartupProject,
+        [string] $Namespace,
+        [string] $ContextNamespace,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     $dteProject = GetProject $Project
     $dteStartupProject = GetStartupProject $StartupProject $dteProject
@@ -347,6 +424,16 @@ function Scaffold-DbContext
         $params += '--context', $Context
     }
 
+    if ($Namespace)
+    {
+        $params += '--namespace', $Namespace
+    }
+
+    if ($ContextNamespace)
+    {
+        $params += '--context-namespace', $ContextNamespace
+    }
+
     $params += $Schemas | %{ '--schema', $_ }
     $params += $Tables | %{ '--table', $_ }
 
@@ -363,6 +450,16 @@ function Scaffold-DbContext
     if ($Force)
     {
         $params += '--force'
+    }
+
+    if ($NoOnConfiguring)
+    {
+        $params += '--no-onconfiguring'
+    }
+
+    if ($RemainingArguments -ne $null)
+    {
+        $params += $RemainingArguments
     }
 
     # NB: -join is here to support ConvertFrom-Json on PowerShell 3.0
@@ -403,6 +500,9 @@ Register-TabExpansion Script-DbContext @{
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
 
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
+
 .LINK
     about_EntityFrameworkCore
 #>
@@ -413,7 +513,9 @@ function Script-DbContext
         [string] $Output,
         [string] $Context,
         [string] $Project,
-        [string] $StartupProject)
+        [string] $StartupProject,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     $dteProject = GetProject $Project
     $dteStartupProject = GetStartupProject $StartupProject $dteProject
@@ -438,6 +540,12 @@ function Script-DbContext
     $params = 'dbcontext', 'script', '--output', $Output
 
     $params += GetParams $Context
+
+    if ($RemainingArguments -ne $null)
+    {
+        $params += $RemainingArguments
+    }
+
 
     EF $dteProject $dteStartupProject $params
 
@@ -485,6 +593,9 @@ Register-TabExpansion Script-Migration @{
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
 
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
+
 .LINK
     Update-Database
     about_EntityFrameworkCore
@@ -502,7 +613,9 @@ function Script-Migration
         [string] $Output,
         [string] $Context,
         [string] $Project,
-        [string] $StartupProject)
+        [string] $StartupProject,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     $dteProject = GetProject $Project
     $dteStartupProject = GetStartupProject $StartupProject $dteProject
@@ -543,6 +656,12 @@ function Script-Migration
 
     $params += GetParams $Context
 
+    if ($RemainingArguments -ne $null)
+    {
+        $params += $RemainingArguments
+    }
+
+
     EF $dteProject $dteStartupProject $params
 
     $DTE.ItemOperations.OpenFile($Output) | Out-Null
@@ -570,6 +689,9 @@ Register-TabExpansion Update-Database @{
 .PARAMETER Migration
     The target migration. If '0', all migrations will be reverted. Defaults to the last migration.
 
+.PARAMETER Connection
+    The connection string to the database. Defaults to the one specified in AddDbContext or OnConfiguring.
+
 .PARAMETER Context
     The DbContext to use.
 
@@ -578,6 +700,9 @@ Register-TabExpansion Update-Database @{
 
 .PARAMETER StartupProject
     The startup project to use. Defaults to the solution's startup project.
+
+.PARAMETER RemainingArguments
+    Arguments passed to the application.
 
 .LINK
     Script-Migration
@@ -589,9 +714,12 @@ function Update-Database
     param(
         [Parameter(Position = 0)]
         [string] $Migration,
+        [string] $Connection,
         [string] $Context,
         [string] $Project,
-        [string] $StartupProject)
+        [string] $StartupProject,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]] $RemainingArguments)
 
     WarnIfEF6 'Update-Database'
 
@@ -605,7 +733,18 @@ function Update-Database
         $params += $Migration
     }
 
+    if ($Connection)
+    {
+        $params += '--connection', $Connection
+    }
+
     $params += GetParams $Context
+
+    if ($RemainingArguments -ne $null)
+    {
+        $params += $RemainingArguments
+    }
+
 
     EF $dteProject $dteStartupProject $params
 }
@@ -656,9 +795,13 @@ function GetMigrations($context, $projectName, $startupProjectName)
     return $result | %{ $_.safeName }
 }
 
-function WarnIfEF6 ($cmdlet)
+function WarnIfEF6($cmdlet)
 {
-    if (Get-Module 'EntityFramework')
+    if (Get-Module 'EntityFramework6')
+    {
+        Write-Warning "Both Entity Framework Core and Entity Framework 6 are installed. The Entity Framework Core tools are running. Use 'EntityFramework6\$cmdlet' for Entity Framework 6."
+    }
+    elseif (Get-Module 'EntityFramework')
     {
         Write-Warning "Both Entity Framework Core and Entity Framework 6 are installed. The Entity Framework Core tools are running. Use 'EntityFramework\$cmdlet' for Entity Framework 6."
     }
@@ -796,12 +939,6 @@ function WriteErrorLine($message)
 
 function EF($project, $startupProject, $params, [switch] $skipBuild)
 {
-    if (IsXproj $startupProject)
-    {
-        throw "Startup project '$($startupProject.ProjectName)' is an ASP.NET Core or .NET Core project for Visual " +
-            'Studio 2015. This version of the Entity Framework Core Package Manager Console Tools doesn''t support ' +
-            'these types of projects.'
-    }
     if (IsDocker $startupProject)
     {
         throw "Startup project '$($startupProject.ProjectName)' is a Docker project. Select an ASP.NET Core Web " +
@@ -820,7 +957,7 @@ function EF($project, $startupProject, $params, [switch] $skipBuild)
 
     if (!$skipBuild)
     {
-        Write-Verbose 'Build started...'
+        Write-Host 'Build started...'
 
         # TODO: Only build startup project. Don't use BuildProject, you can't specify platform
         $solutionBuild = $DTE.Solution.SolutionBuild
@@ -830,13 +967,13 @@ function EF($project, $startupProject, $params, [switch] $skipBuild)
             throw 'Build failed.'
         }
 
-        Write-Verbose 'Build succeeded.'
+        Write-Host 'Build succeeded.'
     }
 
     $startupProjectDir = GetProperty $startupProject.Properties 'FullPath'
     $outputPath = GetProperty $startupProject.ConfigurationManager.ActiveConfiguration.Properties 'OutputPath'
     $targetDir = [IO.Path]::GetFullPath([IO.Path]::Combine($startupProjectDir, $outputPath))
-    $startupTargetFileName = GetOutputFileName $startupProject
+    $startupTargetFileName = GetProperty $startupProject.Properties 'OutputFileName'
     $startupTargetPath = Join-Path $targetDir $startupTargetFileName
     $targetFrameworkMoniker = GetProperty $startupProject.Properties 'TargetFrameworkMoniker'
     $frameworkName = New-Object 'System.Runtime.Versioning.FrameworkName' $targetFrameworkMoniker
@@ -911,7 +1048,7 @@ function EF($project, $startupProject, $params, [switch] $skipBuild)
     }
 
     $projectDir = GetProperty $project.Properties 'FullPath'
-    $targetFileName = GetOutputFileName $project
+    $targetFileName = GetProperty $project.Properties 'OutputFileName'
     $targetPath = Join-Path $targetDir $targetFileName
     $rootNamespace = GetProperty $project.Properties 'RootNamespace'
     $language = GetLanguage $project
@@ -995,11 +1132,6 @@ function EF($project, $startupProject, $params, [switch] $skipBuild)
     }
 }
 
-function IsXproj($project)
-{
-    return $project.Kind -eq '{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}'
-}
-
 function IsDocker($project)
 {
     return $project.Kind -eq '{E53339B2-1760-4266-BCC7-CA923CBCF16C}'
@@ -1031,12 +1163,6 @@ function IsUWP($project)
 
 function GetIntermediatePath($project)
 {
-    # TODO: Remove when dotnet/roslyn-project-system#665 is fixed
-    if (IsCpsProject $project)
-    {
-        return GetCpsProperty $project 'IntermediateOutputPath'
-    }
-
     $intermediatePath = GetProperty $project.ConfigurationManager.ActiveConfiguration.Properties 'IntermediatePath'
     if ($intermediatePath)
     {
@@ -1048,7 +1174,6 @@ function GetIntermediatePath($project)
 
 function GetPlatformTarget($project)
 {
-    # TODO: Remove when dotnet/roslyn-project-system#669 is fixed
     if (IsCpsProject $project)
     {
         $platformTarget = GetCpsProperty $project 'PlatformTarget'
@@ -1066,6 +1191,7 @@ function GetPlatformTarget($project)
         return $platformTarget
     }
 
+    # NB: For classic F# projects
     $platformTarget = GetMSBuildProperty $project 'PlatformTarget'
     if ($platformTarget)
     {
@@ -1073,17 +1199,6 @@ function GetPlatformTarget($project)
     }
 
     return 'AnyCPU'
-}
-
-function GetOutputFileName($project)
-{
-    # TODO: Remove when dotnet/roslyn-project-system#667 is fixed
-    if (IsCpsProject $project)
-    {
-        return GetCpsProperty $project 'TargetFileName'
-    }
-
-    return GetProperty $project.Properties 'OutputFileName'
 }
 
 function GetLanguage($project)

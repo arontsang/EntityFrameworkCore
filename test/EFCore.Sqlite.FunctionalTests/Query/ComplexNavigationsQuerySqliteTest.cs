@@ -6,98 +6,55 @@ using Xunit;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
-    public class ComplexNavigationsQuerySqliteTest : ComplexNavigationsQueryTestBase<ComplexNavigationsQuerySqliteFixture>
+    public class ComplexNavigationsQuerySqliteTest : ComplexNavigationsQueryRelationalTestBase<ComplexNavigationsQuerySqliteFixture>
     {
         public ComplexNavigationsQuerySqliteTest(ComplexNavigationsQuerySqliteFixture fixture)
             : base(fixture)
         {
         }
 
-        // Skip for SQLite. Issue #14935. Cannot eval 'from <>f__AnonymousType100`1 <generated>_1 in {from Level2 l2 in value(Microsoft.EntityFrameworkCore.Query.Internal.EntityQueryable`1[Microsoft.EntityFrameworkCore.TestModels.ComplexNavigationsModel.Level2]) where  ?= (Convert(Property([l1], \"Id\"), Nullable`1) == Property([l2], \"OneToMany_Optional_Inverse2Id\")) =? select new <>f__AnonymousType100`1(Name = [l2].Name)}'
-        public override Task SelectMany_subquery_with_custom_projection(bool isAsync) => null;
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany2(bool isAsync)
+        [ConditionalTheory(Skip = "Issue #17230")]
+        public override Task SelectMany_with_navigation_filter_paging_and_explicit_DefaultIfEmpty(bool async)
         {
-            return base.SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany2(isAsync);
+            return base.SelectMany_with_navigation_filter_paging_and_explicit_DefaultIfEmpty(async);
         }
 
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task Multiple_SelectMany_with_navigation_and_explicit_DefaultIfEmpty(bool isAsync)
+        [ConditionalTheory(Skip = "Issue #17230")]
+        public override Task Project_collection_navigation_nested_with_take(bool async)
         {
-            return base.Multiple_SelectMany_with_navigation_and_explicit_DefaultIfEmpty(isAsync);
+            return base.Project_collection_navigation_nested_with_take(async);
         }
 
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task Multiple_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_joined_together(bool isAsync)
+        [ConditionalTheory(Skip = "Issue #17230")]
+        public override Task Include_inside_subquery(bool async)
         {
-            return base.Multiple_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_joined_together(isAsync);
+            return base.Include_inside_subquery(async);
         }
 
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_navigation_and_explicit_DefaultIfEmpty(bool isAsync)
-        {
-            return base.SelectMany_with_navigation_and_explicit_DefaultIfEmpty(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany(bool isAsync)
-        {
-            return base.SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_followed_by_Select_required_navigation_using_same_navs(bool isAsync)
-        {
-            return base.SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_followed_by_Select_required_navigation_using_same_navs(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany3(bool isAsync)
-        {
-            return base.SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany3(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigation_filter_and_explicit_DefaultIfEmpty(bool isAsync)
-        {
-            return base.SelectMany_with_nested_navigation_filter_and_explicit_DefaultIfEmpty(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigation_and_explicit_DefaultIfEmpty(bool isAsync)
-        {
-            return base.SelectMany_with_nested_navigation_and_explicit_DefaultIfEmpty(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_navigation_filter_and_explicit_DefaultIfEmpty(bool isAsync)
-        {
-            return base.SelectMany_with_navigation_filter_and_explicit_DefaultIfEmpty(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_followed_by_Select_required_navigation_using_different_navs(bool isAsync)
-        {
-            return base.SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_followed_by_Select_required_navigation_using_different_navs(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany4(bool isAsync)
-        {
-            return base.SelectMany_with_nested_navigations_explicit_DefaultIfEmpty_and_additional_joins_outside_of_SelectMany4(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task SelectMany_with_nested_required_navigation_filter_and_explicit_DefaultIfEmpty(bool isAsync)
-        {
-            return base.SelectMany_with_nested_required_navigation_filter_and_explicit_DefaultIfEmpty(isAsync);
-        }
-
-        [ConditionalTheory(Skip = "issue #15081")]
-        public override Task Complex_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_with_other_query_operators_composed_on_top(bool isAsync)
-        {
-            return base.Complex_SelectMany_with_nested_navigations_and_explicit_DefaultIfEmpty_with_other_query_operators_composed_on_top(isAsync);
-        }
+        // Sqlite does not support cross/outer apply
+        public override Task SelectMany_with_outside_reference_to_joined_table_correctly_translated_to_apply(bool async) => null;
+        public override Task Nested_SelectMany_correlated_with_join_table_correctly_translated_to_apply(bool async) => null;
+        public override void Filtered_include_Skip_without_OrderBy() { }
+        public override void Filtered_include_Take_without_OrderBy() { }
+        public override Task Filtered_include_after_different_filtered_include_same_level(bool async) => null;
+        public override Task Filtered_include_after_different_filtered_include_different_level(bool async) => null;
+        public override Task Filtered_include_after_reference_navigation(bool async) => null;
+        public override Task Filtered_include_and_non_filtered_include_on_same_navigation1(bool async) => null;
+        public override Task Filtered_include_and_non_filtered_include_on_same_navigation2(bool async) => null;
+        public override Task Filtered_include_basic_OrderBy_Take(bool async) => null;
+        public override Task Filtered_include_basic_OrderBy_Skip(bool async) => null;
+        public override Task Filtered_include_basic_OrderBy_Skip_Take(bool async) => null;
+        public override void Filtered_include_context_accessed_inside_filter() { }
+        public override void Filtered_include_context_accessed_inside_filter_correlated() { }
+        public override Task Filtered_include_on_ThenInclude(bool async) => null;
+        public override void Filtered_include_outer_parameter_used_inside_filter() { }
+        public override void Filtered_include_variable_used_inside_filter() { }
+        public override void Filtered_include_is_considered_loaded() { }
+        public override Task Filtered_include_and_non_filtered_include_followed_by_then_include_on_same_navigation(bool async) => null;
+        public override Task Filtered_include_multiple_multi_level_includes_with_first_level_using_filter_include_on_one_of_the_chains_only(bool async) => null;
+        public override Task Filtered_include_same_filter_set_on_same_navigation_twice(bool async) => null;
+        public override Task Filtered_include_same_filter_set_on_same_navigation_twice_followed_by_ThenIncludes(bool async) => null;
+        public override Task Filtered_include_complex_three_level_with_middle_having_filter1(bool async) => null;
+        public override Task Filtered_include_complex_three_level_with_middle_having_filter2(bool async) => null;
     }
 }

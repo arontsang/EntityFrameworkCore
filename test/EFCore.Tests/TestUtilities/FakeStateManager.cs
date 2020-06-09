@@ -24,12 +24,6 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
         public bool SaveChangesCalled { get; set; }
         public bool SaveChangesAsyncCalled { get; set; }
 
-        public TrackingQueryMode GetTrackingQueryMode(IEntityType entityType) => TrackingQueryMode.Multiple;
-
-        public void EndSingleQueryMode()
-        {
-        }
-
         public void ResetState()
         {
         }
@@ -68,30 +62,38 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
             bool unchanged = false)
             => throw new NotImplementedException();
 
+        public int ChangedCount { get; set; }
+
         public int Count => throw new NotImplementedException();
+
+        public IDiagnosticsLogger<DbLoggerCategory.Update> UpdateLogger { get; }
+
+        public void Clear() => throw new NotImplementedException();
+
+        public bool SavingChanges => throw new NotImplementedException();
 
         public IEnumerable<TEntity> GetNonDeletedEntities<TEntity>()
             where TEntity : class
             => throw new NotImplementedException();
 
-        public int ChangedCount { get; set; }
-
         public IEntityFinder CreateEntityFinder(IEntityType entityType) => throw new NotImplementedException();
         public void UpdateIdentityMap(InternalEntityEntry entry, IKey principalKey) => throw new NotImplementedException();
         public void UpdateDependentMap(InternalEntityEntry entry, IForeignKey foreignKey) => throw new NotImplementedException();
 
-        public IEnumerable<InternalEntityEntry> GetDependents(InternalEntityEntry principalEntry, IForeignKey foreignKey) =>
+        public IEnumerable<IUpdateEntry> GetDependents(IUpdateEntry principalEntry, IForeignKey foreignKey) =>
             throw new NotImplementedException();
 
-        public IEnumerable<InternalEntityEntry> GetDependentsUsingRelationshipSnapshot(
-            InternalEntityEntry principalEntry, IForeignKey foreignKey) => throw new NotImplementedException();
+        public IEnumerable<IUpdateEntry> GetDependentsUsingRelationshipSnapshot(
+            IUpdateEntry principalEntry, IForeignKey foreignKey) => throw new NotImplementedException();
 
-        public IEnumerable<InternalEntityEntry> GetDependentsFromNavigation(InternalEntityEntry principalEntry, IForeignKey foreignKey) =>
+        public IEnumerable<IUpdateEntry> GetDependentsFromNavigation(IUpdateEntry principalEntry, IForeignKey foreignKey) =>
             throw new NotImplementedException();
 
-        public IList<IUpdateEntry> GetEntriesToSave() => Enumerable.Empty<IUpdateEntry>().ToList();
+        public IList<IUpdateEntry> GetEntriesToSave(bool cascadeChanges) => Enumerable.Empty<IUpdateEntry>().ToList();
         public virtual void AcceptAllChanges() => throw new NotImplementedException();
         public StateManagerDependencies Dependencies { get; }
+        public CascadeTiming DeleteOrphansTiming { get; set; }
+        public CascadeTiming CascadeDeleteTiming { get; set; }
         public InternalEntityEntry GetOrCreateEntry(object entity) => throw new NotImplementedException();
         public InternalEntityEntry GetOrCreateEntry(object entity, IEntityType entityType) => throw new NotImplementedException();
 
@@ -99,7 +101,7 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
             throw new NotImplementedException();
 
         public InternalEntityEntry StartTrackingFromQuery(
-            IEntityType baseEntityType, object entity, in ValueBuffer valueBuffer, ISet<IForeignKey> handledForeignKeys) =>
+            IEntityType baseEntityType, object entity, in ValueBuffer valueBuffer) =>
             throw new NotImplementedException();
 
         public void BeginTrackingQuery() => throw new NotImplementedException();
@@ -109,8 +111,10 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
             throw new NotImplementedException();
 
         public InternalEntityEntry TryGetEntry(object entity, bool throwOnNonUniqueness = true) => throw new NotImplementedException();
+
         public InternalEntityEntry TryGetEntry(object entity, IEntityType type, bool throwOnTypeMismatch = true)
             => throw new NotImplementedException();
+
         public IInternalEntityEntryNotifier InternalEntityEntryNotifier => throw new NotImplementedException();
         public void StateChanging(InternalEntityEntry entry, EntityState newState) => throw new NotImplementedException();
         public IValueGenerationManager ValueGenerationManager => throw new NotImplementedException();
@@ -134,10 +138,11 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
         public InternalEntityEntry FindPrincipalUsingRelationshipSnapshot(InternalEntityEntry entityEntry, IForeignKey foreignKey) =>
             throw new NotImplementedException();
 
-        public DbContext Context => new DbContext(new DbContextOptionsBuilder()
-            .UseInternalServiceProvider(InMemoryFixture.DefaultServiceProvider)
-            .UseInMemoryDatabase("D")
-            .Options);
+        public DbContext Context => new DbContext(
+            new DbContextOptionsBuilder()
+                .UseInternalServiceProvider(InMemoryFixture.DefaultServiceProvider)
+                .UseInMemoryDatabase("D")
+                .Options);
 
         public IModel Model => throw new NotImplementedException();
         public event EventHandler<EntityTrackedEventArgs> Tracked;
@@ -146,13 +151,13 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
         public void OnStateChanged(InternalEntityEntry internalEntityEntry, EntityState oldState) => StateChanged?.Invoke(null, null);
         public bool SensitiveLoggingEnabled { get; }
         public void CascadeChanges(bool force) => throw new NotImplementedException();
-        public void CascadeDelete(InternalEntityEntry entry, bool force) => throw new NotImplementedException();
+
+        public void CascadeDelete(InternalEntityEntry entry, bool force, IEnumerable<IForeignKey> foreignKeys = null) =>
+            throw new NotImplementedException();
 
         public InternalEntityEntry TryGetEntry([NotNull] IKey key, object[] keyValues, bool throwOnNullKey, out bool hasNullKey)
         {
             throw new NotImplementedException();
         }
-
-        public IDiagnosticsLogger<DbLoggerCategory.Update> UpdateLogger { get; }
     }
 }

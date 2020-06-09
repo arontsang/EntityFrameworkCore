@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -31,7 +31,7 @@ namespace Microsoft.EntityFrameworkCore
             Check.NotNull(entityTypeBuilder, nameof(entityTypeBuilder));
             Check.NullButNotEmpty(name, nameof(name));
 
-            entityTypeBuilder.Metadata.SetCosmosContainer(name);
+            entityTypeBuilder.Metadata.SetContainer(name);
 
             return entityTypeBuilder;
         }
@@ -57,7 +57,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder ToContainer(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
@@ -69,7 +69,7 @@ namespace Microsoft.EntityFrameworkCore
                 return null;
             }
 
-            entityTypeBuilder.Metadata.SetCosmosContainer(name, fromDataAnnotation);
+            entityTypeBuilder.Metadata.SetContainer(name, fromDataAnnotation);
 
             return entityTypeBuilder;
         }
@@ -81,7 +81,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
         /// <param name="name"> The name of the container. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the configuration can be applied. </returns>
+        /// <returns> <see langword="true" /> if the configuration can be applied. </returns>
         public static bool CanSetContainer(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder, [CanBeNull] string name, bool fromDataAnnotation = false)
         {
@@ -101,7 +101,7 @@ namespace Microsoft.EntityFrameworkCore
             [NotNull] this OwnedNavigationBuilder entityTypeBuilder,
             [CanBeNull] string name)
         {
-            entityTypeBuilder.OwnedEntityType.SetCosmosContainingPropertyName(name);
+            entityTypeBuilder.OwnedEntityType.SetContainingPropertyName(name);
 
             return entityTypeBuilder;
         }
@@ -118,7 +118,7 @@ namespace Microsoft.EntityFrameworkCore
             where TEntity : class
             where TDependentEntity : class
         {
-            entityTypeBuilder.OwnedEntityType.SetCosmosContainingPropertyName(name);
+            entityTypeBuilder.OwnedEntityType.SetContainingPropertyName(name);
 
             return entityTypeBuilder;
         }
@@ -131,7 +131,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder ToJsonProperty(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
@@ -143,7 +143,7 @@ namespace Microsoft.EntityFrameworkCore
                 return null;
             }
 
-            entityTypeBuilder.Metadata.SetCosmosContainingPropertyName(name, fromDataAnnotation);
+            entityTypeBuilder.Metadata.SetContainingPropertyName(name, fromDataAnnotation);
 
             return entityTypeBuilder;
         }
@@ -155,7 +155,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
         /// <param name="name"> The name of the parent property. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the configuration can be applied. </returns>
+        /// <returns> <see langword="true" /> if the configuration can be applied. </returns>
         public static bool CanSetJsonProperty(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder, [CanBeNull] string name, bool fromDataAnnotation = false)
         {
@@ -175,7 +175,7 @@ namespace Microsoft.EntityFrameworkCore
             [NotNull] this EntityTypeBuilder entityTypeBuilder,
             [CanBeNull] string name)
         {
-            entityTypeBuilder.Metadata.SetCosmosPartitionKeyPropertyName(name);
+            entityTypeBuilder.Metadata.SetPartitionKeyPropertyName(name);
 
             return entityTypeBuilder;
         }
@@ -191,7 +191,7 @@ namespace Microsoft.EntityFrameworkCore
             [CanBeNull] string name)
             where TEntity : class
         {
-            entityTypeBuilder.Metadata.SetCosmosPartitionKeyPropertyName(name);
+            entityTypeBuilder.Metadata.SetPartitionKeyPropertyName(name);
 
             return entityTypeBuilder;
         }
@@ -209,7 +209,7 @@ namespace Microsoft.EntityFrameworkCore
         {
             Check.NotNull(propertyExpression, nameof(propertyExpression));
 
-            entityTypeBuilder.Metadata.SetCosmosPartitionKeyPropertyName(propertyExpression.GetPropertyAccess().GetSimpleMemberName());
+            entityTypeBuilder.Metadata.SetPartitionKeyPropertyName(propertyExpression.GetMemberAccess().GetSimpleMemberName());
 
             return entityTypeBuilder;
         }
@@ -222,7 +222,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder HasPartitionKey(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
@@ -234,7 +234,7 @@ namespace Microsoft.EntityFrameworkCore
                 return null;
             }
 
-            entityTypeBuilder.Metadata.SetCosmosPartitionKeyPropertyName(name, fromDataAnnotation);
+            entityTypeBuilder.Metadata.SetPartitionKeyPropertyName(name, fromDataAnnotation);
 
             return entityTypeBuilder;
         }
@@ -246,7 +246,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
         /// <param name="name"> The name of the partition key property. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the configuration can be applied. </returns>
+        /// <returns> <see langword="true" /> if the configuration can be applied. </returns>
         public static bool CanSetPartitionKey(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder, [CanBeNull] string name, bool fromDataAnnotation = false)
         {
@@ -254,6 +254,34 @@ namespace Microsoft.EntityFrameworkCore
             Check.NullButNotEmpty(name, nameof(name));
 
             return entityTypeBuilder.CanSetAnnotation(CosmosAnnotationNames.PartitionKeyName, name, fromDataAnnotation);
+        }
+
+        /// <summary>
+        ///     Configures this entity to use CosmosDb etag concurrency checks.
+        /// </summary>
+        /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
+        /// <returns> The same builder instance so that multiple calls can be chained. </returns>
+        public static EntityTypeBuilder UseETagConcurrency([NotNull] this EntityTypeBuilder entityTypeBuilder)
+        {
+            Check.NotNull(entityTypeBuilder, nameof(entityTypeBuilder));
+
+            entityTypeBuilder.Property<string>("_etag")
+                .ValueGeneratedOnAddOrUpdate()
+                .IsConcurrencyToken();
+            return entityTypeBuilder;
+        }
+
+        /// <summary>
+        ///     Configures this entity to use CosmosDb etag concurrency checks.
+        /// </summary>
+        /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
+        /// <returns> The same builder instance so that multiple calls can be chained. </returns>
+        public static EntityTypeBuilder<TEntity> UseETagConcurrency<TEntity>([NotNull] this EntityTypeBuilder<TEntity> entityTypeBuilder)
+            where TEntity : class
+        {
+            Check.NotNull(entityTypeBuilder, nameof(entityTypeBuilder));
+            UseETagConcurrency((EntityTypeBuilder)entityTypeBuilder);
+            return entityTypeBuilder;
         }
     }
 }

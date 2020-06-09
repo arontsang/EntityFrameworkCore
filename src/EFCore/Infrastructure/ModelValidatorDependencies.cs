@@ -26,10 +26,10 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
     ///         services using the 'With...' methods. Do not call the constructor at any point in this process.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/>.
-    ///         This means a single instance of each service is used by many <see cref="DbContext"/> instances.
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />.
+    ///         This means a single instance of each service is used by many <see cref="DbContext" /> instances.
     ///         The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public sealed class ModelValidatorDependencies
@@ -77,6 +77,7 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
         /// <summary>
         ///     The member classifier.
         /// </summary>
+        [EntityFrameworkInternal]
         public IMemberClassifier MemberClassifier { get; }
 
         /// <summary>
@@ -92,6 +93,7 @@ namespace Microsoft.EntityFrameworkCore.Infrastructure
         /// </summary>
         /// <param name="memberClassifier"> A replacement for the current dependency of this type. </param>
         /// <returns> A new parameter object with the given service replaced. </returns>
+        [EntityFrameworkInternal]
         public ModelValidatorDependencies With([NotNull] IMemberClassifier memberClassifier)
             => new ModelValidatorDependencies(TypeMappingSource, memberClassifier);
     }

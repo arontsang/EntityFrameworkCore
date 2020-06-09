@@ -9,10 +9,10 @@ using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 {
     /// <summary>
-    ///     A convention that configures the default model <see cref="SqlServerValueGenerationStrategy"/> as
-    ///     <see cref="SqlServerValueGenerationStrategy.IdentityColumn"/>.
+    ///     A convention that configures the default model <see cref="SqlServerValueGenerationStrategy" /> as
+    ///     <see cref="SqlServerValueGenerationStrategy.IdentityColumn" />.
     /// </summary>
-    public class SqlServerValueGenerationStrategyConvention : IModelInitializedConvention, IModelFinalizedConvention
+    public class SqlServerValueGenerationStrategyConvention : IModelInitializedConvention, IModelFinalizingConvention
     {
         /// <summary>
         ///     Creates a new instance of <see cref="SqlServerValueGenerationStrategyConvention" />.
@@ -36,25 +36,36 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
         /// </summary>
         /// <param name="modelBuilder"> The builder for the model. </param>
         /// <param name="context"> Additional information associated with convention execution. </param>
-        public virtual void ProcessModelInitialized(IConventionModelBuilder modelBuilder, IConventionContext<IConventionModelBuilder> context)
+        public virtual void ProcessModelInitialized(
+            IConventionModelBuilder modelBuilder, IConventionContext<IConventionModelBuilder> context)
         {
             modelBuilder.HasValueGenerationStrategy(SqlServerValueGenerationStrategy.IdentityColumn);
         }
 
-        /// <summary>
-        ///     Called after a model is finalized.
-        /// </summary>
-        /// <param name="modelBuilder"> The builder for the model. </param>
-        /// <param name="context"> Additional information associated with convention execution. </param>
-        public virtual void ProcessModelFinalized(
+        /// <inheritdoc />
+        public virtual void ProcessModelFinalizing(
             IConventionModelBuilder modelBuilder, IConventionContext<IConventionModelBuilder> context)
         {
             foreach (var entityType in modelBuilder.Metadata.GetEntityTypes())
             {
                 foreach (var property in entityType.GetDeclaredProperties())
                 {
+                    var strategy = SqlServerValueGenerationStrategy.None;
                     // Needed for the annotation to show up in the model snapshot
-                    var strategy = property.GetSqlServerValueGenerationStrategy();
+                    var table = entityType.GetTableName();
+                    if (table != null)
+                    {
+                        strategy = property.GetValueGenerationStrategy(table, entityType.GetSchema());
+                    }
+                    else
+                    {
+                        var view = entityType.GetViewName();
+                        if (view != null)
+                        {
+                            strategy = property.GetValueGenerationStrategy(view, entityType.GetViewSchema());
+                        }
+                    }
+
                     if (strategy != SqlServerValueGenerationStrategy.None)
                     {
                         property.Builder.HasValueGenerationStrategy(strategy);

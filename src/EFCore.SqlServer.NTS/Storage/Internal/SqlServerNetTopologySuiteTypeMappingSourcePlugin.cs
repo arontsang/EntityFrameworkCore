@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -20,18 +20,17 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/> and multiple registrations
-    ///         are allowed. This means a single instance of each service is used by many <see cref="DbContext"/>
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" /> and multiple registrations
+    ///         are allowed. This means a single instance of each service is used by many <see cref="DbContext" />
     ///         instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public class SqlServerNetTopologySuiteTypeMappingSourcePlugin : IRelationalTypeMappingSourcePlugin
     {
         private readonly HashSet<string> _spatialStoreTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "geometry",
-            "geography"
+            "geometry", "geography"
         };
 
         private readonly NtsGeometryServices _geometryServices;
@@ -57,17 +56,17 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
         /// </summary>
         public virtual RelationalTypeMapping FindMapping(in RelationalTypeMappingInfo mappingInfo)
         {
-            var clrType = mappingInfo.ClrType ?? typeof(Geometry);
+            var clrType = mappingInfo.ClrType;
             var storeTypeName = mappingInfo.StoreTypeName;
 
             return typeof(Geometry).IsAssignableFrom(clrType)
-                   || (storeTypeName != null
-                       && _spatialStoreTypes.Contains(storeTypeName))
-                ? (RelationalTypeMapping)Activator.CreateInstance(
-                    typeof(SqlServerGeometryTypeMapping<>).MakeGenericType(clrType),
-                    _geometryServices,
-                    storeTypeName ?? "geography")
-                : null;
+                || (storeTypeName != null
+                    && _spatialStoreTypes.Contains(storeTypeName))
+                    ? (RelationalTypeMapping)Activator.CreateInstance(
+                        typeof(SqlServerGeometryTypeMapping<>).MakeGenericType(clrType ?? typeof(Geometry)),
+                        _geometryServices,
+                        storeTypeName ?? "geography")
+                    : null;
         }
     }
 }

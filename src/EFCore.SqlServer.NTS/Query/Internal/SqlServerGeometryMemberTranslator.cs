@@ -1,17 +1,24 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Reflection;
+using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Query.SqlExpressions;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore.Utilities;
 using NetTopologySuite.Geometries;
 
 namespace Microsoft.EntityFrameworkCore.SqlServer.Query.Internal
 {
+    /// <summary>
+    ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+    ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+    ///     any release. You should only use it directly in your code with extreme caution and knowing that
+    ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+    /// </summary>
     public class SqlServerGeometryMemberTranslator : IMemberTranslator
     {
         private static readonly IDictionary<MemberInfo, string> _memberToFunctionName = new Dictionary<MemberInfo, string>
@@ -42,18 +49,34 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Query.Internal
         private readonly IRelationalTypeMappingSource _typeMappingSource;
         private readonly ISqlExpressionFactory _sqlExpressionFactory;
 
-        public SqlServerGeometryMemberTranslator(IRelationalTypeMappingSource typeMappingSource,
-            ISqlExpressionFactory sqlExpressionFactory)
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public SqlServerGeometryMemberTranslator(
+            [NotNull] IRelationalTypeMappingSource typeMappingSource,
+            [NotNull] ISqlExpressionFactory sqlExpressionFactory)
         {
             _typeMappingSource = typeMappingSource;
             _sqlExpressionFactory = sqlExpressionFactory;
         }
 
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         public virtual SqlExpression Translate(SqlExpression instance, MemberInfo member, Type returnType)
         {
+            Check.NotNull(member, nameof(member));
+            Check.NotNull(returnType, nameof(returnType));
+
             if (typeof(Geometry).IsAssignableFrom(member.DeclaringType))
             {
-                Debug.Assert(instance.TypeMapping != null, "Instance must have typeMapping assigned.");
+                Check.DebugAssert(instance.TypeMapping != null, "Instance must have typeMapping assigned.");
                 var storeType = instance.TypeMapping.StoreType;
                 var isGeography = string.Equals(storeType, "geography", StringComparison.OrdinalIgnoreCase);
 
@@ -68,6 +91,9 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Query.Internal
                         instance,
                         functionName,
                         Array.Empty<SqlExpression>(),
+                        nullable: true,
+                        instancePropagatesNullability: true,
+                        argumentsPropagateNullability: Array.Empty<bool>(),
                         returnType,
                         resultTypeMapping);
                 }
@@ -76,21 +102,39 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Query.Internal
                 {
                     var whenClauses = new List<CaseWhenClause>
                     {
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("Point"), _sqlExpressionFactory.Constant(OgcGeometryType.Point)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("LineString"), _sqlExpressionFactory.Constant(OgcGeometryType.LineString)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("Polygon"), _sqlExpressionFactory.Constant(OgcGeometryType.Polygon)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("MultiPoint"), _sqlExpressionFactory.Constant(OgcGeometryType.MultiPoint)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("MultiLineString"), _sqlExpressionFactory.Constant(OgcGeometryType.MultiLineString)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("MultiPolygon"), _sqlExpressionFactory.Constant(OgcGeometryType.MultiPolygon)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("GeometryCollection"), _sqlExpressionFactory.Constant(OgcGeometryType.GeometryCollection)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("CircularString"), _sqlExpressionFactory.Constant(OgcGeometryType.CircularString)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("CompoundCurve"), _sqlExpressionFactory.Constant(OgcGeometryType.CompoundCurve)),
-                        new CaseWhenClause(_sqlExpressionFactory.Constant("CurvePolygon"), _sqlExpressionFactory.Constant(OgcGeometryType.CurvePolygon))
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("Point"), _sqlExpressionFactory.Constant(OgcGeometryType.Point)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("LineString"), _sqlExpressionFactory.Constant(OgcGeometryType.LineString)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("Polygon"), _sqlExpressionFactory.Constant(OgcGeometryType.Polygon)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("MultiPoint"), _sqlExpressionFactory.Constant(OgcGeometryType.MultiPoint)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("MultiLineString"),
+                            _sqlExpressionFactory.Constant(OgcGeometryType.MultiLineString)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("MultiPolygon"),
+                            _sqlExpressionFactory.Constant(OgcGeometryType.MultiPolygon)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("GeometryCollection"),
+                            _sqlExpressionFactory.Constant(OgcGeometryType.GeometryCollection)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("CircularString"),
+                            _sqlExpressionFactory.Constant(OgcGeometryType.CircularString)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("CompoundCurve"),
+                            _sqlExpressionFactory.Constant(OgcGeometryType.CompoundCurve)),
+                        new CaseWhenClause(
+                            _sqlExpressionFactory.Constant("CurvePolygon"),
+                            _sqlExpressionFactory.Constant(OgcGeometryType.CurvePolygon))
                     };
 
                     if (isGeography)
                     {
-                        whenClauses.Add(new CaseWhenClause(_sqlExpressionFactory.Constant("FullGlobe"), _sqlExpressionFactory.Constant((OgcGeometryType)126)));
+                        whenClauses.Add(
+                            new CaseWhenClause(
+                                _sqlExpressionFactory.Constant("FullGlobe"), _sqlExpressionFactory.Constant((OgcGeometryType)126)));
                     }
 
                     return _sqlExpressionFactory.Case(
@@ -98,15 +142,20 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Query.Internal
                             instance,
                             "STGeometryType",
                             Array.Empty<SqlExpression>(),
+                            nullable: true,
+                            instancePropagatesNullability: true,
+                            argumentsPropagateNullability: Array.Empty<bool>(),
                             typeof(string)),
                         whenClauses.ToArray());
                 }
 
                 if (Equals(member, _srid))
                 {
-                    return _sqlExpressionFactory.Function(
+                    return _sqlExpressionFactory.NiladicFunction(
                         instance,
                         "STSrid",
+                        nullable: true,
+                        instancePropagatesNullability: true,
                         returnType);
                 }
             }

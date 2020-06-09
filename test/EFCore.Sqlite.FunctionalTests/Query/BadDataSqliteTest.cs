@@ -4,11 +4,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Transactions;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -20,7 +20,7 @@ using Xunit;
 // ReSharper disable InconsistentNaming
 namespace Microsoft.EntityFrameworkCore.Query
 {
-    internal class BadDataSqliteTest : IClassFixture<BadDataSqliteTest.BadDataSqliteFixture>
+    public class BadDataSqliteTest : IClassFixture<BadDataSqliteTest.BadDataSqliteFixture>
     {
         public BadDataSqliteTest(BadDataSqliteFixture fixture) => Fixture = fixture;
 
@@ -29,116 +29,100 @@ namespace Microsoft.EntityFrameworkCore.Query
         [ConditionalFact]
         public void Bad_data_error_handling_invalid_cast_key()
         {
-            using (var context = CreateContext("bad int"))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyInvalidCast("Product", "ProductID", typeof(int), typeof(string)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>().Where(p => p.ProductID != 1).ToList()).Message);
-            }
+            using var context = CreateContext("bad int");
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingPropertyInvalidCast("Product", "ProductID", typeof(int), typeof(string)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>().Where(p => p.ProductID != 1).ToList()).Message);
         }
 
         [ConditionalFact]
         public void Bad_data_error_handling_null_key()
         {
-            using (var context = CreateContext(null, true))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyNullReference("Product", "ProductID", typeof(int)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>().Where(p => p.ProductID != 2).ToList()).Message);
-            }
+            using var context = CreateContext(null, true);
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingPropertyNullReference("Product", "ProductID", typeof(int)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>().Where(p => p.ProductID != 2).ToList()).Message);
         }
 
         [ConditionalFact]
         public void Bad_data_error_handling_invalid_cast()
         {
-            using (var context = CreateContext(1, true, 1))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyInvalidCast("Product", "ProductName", typeof(string), typeof(int)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>().Where(p => p.ProductID != 3).ToList()).Message);
-            }
+            using var context = CreateContext(1, true, 1);
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingPropertyInvalidCast("Product", "ProductName", typeof(string), typeof(int)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>().Where(p => p.ProductID != 3).ToList()).Message);
         }
 
         [ConditionalFact]
         public void Bad_data_error_handling_invalid_cast_projection()
         {
-            using (var context = CreateContext(1))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyInvalidCast("Product", "ProductName", typeof(string), typeof(int)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>().Where(p => p.ProductID != 4)
-                                .Select(p => p.ProductName)
-                                .ToList()).Message);
-            }
+            using var context = CreateContext(1);
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingValueInvalidCast(typeof(string), typeof(int)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>().Where(p => p.ProductID != 4)
+                            .Select(p => p.ProductName)
+                            .ToList()).Message);
         }
 
         [ConditionalFact]
         public void Bad_data_error_handling_invalid_cast_no_tracking()
         {
-            using (var context = CreateContext("bad int"))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyInvalidCast("Product", "ProductID", typeof(int), typeof(string)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>()
-                                .Where(p => p.ProductID != 5)
-                                .AsNoTracking()
-                                .ToList()).Message);
-            }
+            using var context = CreateContext("bad int");
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingPropertyInvalidCast("Product", "ProductID", typeof(int), typeof(string)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>()
+                            .Where(p => p.ProductID != 5)
+                            .AsNoTracking()
+                            .ToList()).Message);
         }
 
         [ConditionalFact]
         public void Bad_data_error_handling_null()
         {
-            using (var context = CreateContext(1, null))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyNullReference("Product", "Discontinued", typeof(bool)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>().Where(p => p.ProductID != 6).ToList()).Message);
-            }
+            using var context = CreateContext(1, null);
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingPropertyNullReference("Product", "Discontinued", typeof(bool)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>().Where(p => p.ProductID != 6).ToList()).Message);
         }
 
         [ConditionalFact]
         public void Bad_data_error_handling_null_projection()
         {
-            using (var context = CreateContext(new object[] { null }))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyNullReference("Product", "Discontinued", typeof(bool)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>()
-                                .Where(p => p.ProductID != 7)
-                                .Select(p => p.Discontinued)
-                                .ToList()).Message);
-            }
+            using var context = CreateContext(new object[] { null });
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingValueNullReference(typeof(bool)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>()
+                            .Where(p => p.ProductID != 7)
+                            .Select(p => p.Discontinued)
+                            .ToList()).Message);
         }
 
         [ConditionalFact]
         public void Bad_data_error_handling_null_no_tracking()
         {
-            using (var context = CreateContext(null, true))
-            {
-                Assert.Equal(
-                    CoreStrings.ErrorMaterializingPropertyNullReference("Product", "ProductID", typeof(int)),
-                    Assert.Throws<InvalidOperationException>(
-                        () =>
-                            context.Set<Product>()
-                                .Where(p => p.ProductID != 8)
-                                .AsNoTracking()
-                                .ToList()).Message);
-            }
+            using var context = CreateContext(null, true);
+            Assert.Equal(
+                CoreStrings.ErrorMaterializingPropertyNullReference("Product", "ProductID", typeof(int)),
+                Assert.Throws<InvalidOperationException>(
+                    () =>
+                        context.Set<Product>()
+                            .Where(p => p.ProductID != 8)
+                            .AsNoTracking()
+                            .ToList()).Message);
         }
 
         // ReSharper disable once ClassNeverInstantiated.Local
@@ -361,13 +345,13 @@ namespace Microsoft.EntityFrameworkCore.Query
             public Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default) =>
                 throw new NotImplementedException();
 
-            public void CommitTransaction()
-            {
-            }
+            public void CommitTransaction() { }
+            public Task CommitTransactionAsync(CancellationToken cancellationToken = default)
+                => Task.CompletedTask;
 
-            public void RollbackTransaction()
-            {
-            }
+            public void RollbackTransaction() { }
+            public Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
+                => Task.CompletedTask;
 
             public IDbContextTransaction CurrentTransaction => throw new NotImplementedException();
             public SemaphoreSlim Semaphore { get; }
@@ -384,18 +368,24 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             public bool Close() => true;
 
-            public Task<bool> CloseAsync() => Task.FromResult<bool>(true);
+            public Task<bool> CloseAsync() => Task.FromResult(true);
 
             public bool IsMultipleActiveResultSetsEnabled { get; }
-            public IDbContextTransaction BeginTransaction(System.Data.IsolationLevel isolationLevel) => throw new NotImplementedException();
+            public IDbContextTransaction BeginTransaction(IsolationLevel isolationLevel) => throw new NotImplementedException();
 
             public Task<IDbContextTransaction> BeginTransactionAsync(
-                System.Data.IsolationLevel isolationLevel, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+                IsolationLevel isolationLevel, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
             public IDbContextTransaction UseTransaction(DbTransaction transaction) => throw new NotImplementedException();
 
+            public IDbContextTransaction UseTransaction(DbTransaction transaction, Guid transactionId) =>
+                throw new NotImplementedException();
+
             public Task<IDbContextTransaction> UseTransactionAsync(
                 DbTransaction transaction, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
+            public Task<IDbContextTransaction> UseTransactionAsync(
+                DbTransaction transaction, Guid transactionId, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 
             public void Dispose()
             {

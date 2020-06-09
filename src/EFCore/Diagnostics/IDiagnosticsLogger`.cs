@@ -19,8 +19,8 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
     ///         sensitive data or not can be made.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -28,9 +28,5 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
     public interface IDiagnosticsLogger<TLoggerCategory> : IDiagnosticsLogger
         where TLoggerCategory : LoggerCategory<TLoggerCategory>, new()
     {
-        /// <summary>
-        ///     Holds registered interceptors, if any.
-        /// </summary>
-        IInterceptors Interceptors { get; }
     }
 }

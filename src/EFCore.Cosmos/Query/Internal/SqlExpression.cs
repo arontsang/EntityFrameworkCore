@@ -1,8 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Linq.Expressions;
+using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -14,7 +16,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
     ///     any release. You should only use it directly in your code with extreme caution and knowing that
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
-    public abstract class SqlExpression : Expression, IPrintable
+    public abstract class SqlExpression : Expression, IPrintableExpression
     {
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -22,7 +24,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        protected SqlExpression(Type type, CoreTypeMapping typeMapping)
+        protected SqlExpression([NotNull] Type type, [CanBeNull] CoreTypeMapping typeMapping)
         {
             Type = type;
             TypeMapping = typeMapping;
@@ -51,7 +53,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override Expression VisitChildren(ExpressionVisitor visitor)
-            => throw new InvalidOperationException("VisitChildren must be overridden in class deriving from SqlExpression");
+            => throw new InvalidOperationException(CoreStrings.VisitChildrenMustBeOverridden);
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -67,7 +69,10 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public abstract void Print(ExpressionPrinter expressionPrinter);
+        protected abstract void Print([NotNull] ExpressionPrinter expressionPrinter);
+
+        /// <inheritdoc />
+        void IPrintableExpression.Print(ExpressionPrinter expressionPrinter) => Print(expressionPrinter);
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -77,13 +82,13 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         /// </summary>
         public override bool Equals(object obj)
             => obj != null
-            && (ReferenceEquals(this, obj)
-                || obj is SqlExpression sqlExpression
-                    && Equals(sqlExpression));
+               && (ReferenceEquals(this, obj)
+                   || obj is SqlExpression sqlExpression
+                   && Equals(sqlExpression));
 
         private bool Equals(SqlExpression sqlExpression)
             => Type == sqlExpression.Type
-            && TypeMapping?.Equals(sqlExpression.TypeMapping) == true;
+               && TypeMapping?.Equals(sqlExpression.TypeMapping) == true;
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to

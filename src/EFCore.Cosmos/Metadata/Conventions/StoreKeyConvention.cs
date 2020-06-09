@@ -1,31 +1,50 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System.Linq;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Cosmos.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Cosmos.ValueGeneration.Internal;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Utilities;
 using Newtonsoft.Json.Linq;
 
+// ReSharper disable once CheckNamespace
 namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 {
     /// <summary>
     ///     <para>
     ///         A convention that adds the 'id' property - a key required by Azure Cosmos.
     ///     </para>
-    ///         This convention also add the '__jObject' containing the JSON object returned by the store.
     ///     <para>
-    /// </para>
+    ///         This convention also adds the '__jObject' containing the JSON object returned by the store.
+    ///     </para>
     /// </summary>
     public class StoreKeyConvention :
         IEntityTypeAddedConvention,
         IForeignKeyOwnershipChangedConvention,
+        IForeignKeyRemovedConvention,
         IEntityTypeAnnotationChangedConvention,
         IEntityTypeBaseTypeChangedConvention
     {
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        [EntityFrameworkInternal]
         public static readonly string IdPropertyName = "id";
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        [EntityFrameworkInternal]
         public static readonly string JObjectPropertyName = "__jObject";
 
         /// <summary>
@@ -44,35 +63,67 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 
         private static void Process(IConventionEntityTypeBuilder entityTypeBuilder)
         {
+            IConventionKey newKey = null;
+            IConventionProperty idProperty = null;
             var entityType = entityTypeBuilder.Metadata;
             if (entityType.BaseType == null
                 && entityType.IsDocumentRoot()
                 && !entityType.IsKeyless)
             {
-                var idProperty = entityTypeBuilder.Property(typeof(string), IdPropertyName);
-                idProperty.HasValueGenerator((_, __) => new IdValueGenerator());
-                entityTypeBuilder.HasKey(new[] { idProperty.Metadata });
+                idProperty = entityTypeBuilder.Property(typeof(string), IdPropertyName, setTypeConfigurationSource: false)
+                    ?.Metadata;
 
+                if (idProperty != null)
+                {
+                    if (idProperty.ClrType == typeof(string))
+                    {
+                        idProperty.Builder.HasValueGenerator((_, __) => new IdValueGenerator());
+                    }
+
+                    var partitionKey = entityType.GetPartitionKeyPropertyName();
+                    if (partitionKey != null)
+                    {
+                        var partitionKeyProperty = entityType.FindProperty(partitionKey);
+                        if (partitionKeyProperty != null)
+                        {
+                            newKey = entityTypeBuilder.HasKey(new[] { idProperty, partitionKeyProperty })?.Metadata;
+                        }
+                    }
+                    else
+                    {
+                        newKey = entityTypeBuilder.HasKey(new[] { idProperty })?.Metadata;
+                    }
+                }
+            }
+            else
+            {
+                idProperty = entityType.FindDeclaredProperty(IdPropertyName);
+            }
+
+            if (idProperty != null)
+            {
+                foreach (var key in idProperty.GetContainingKeys().ToList())
+                {
+                    if (key != newKey)
+                    {
+                        key.DeclaringEntityType.Builder.HasNoKey(key);
+                    }
+                }
+            }
+
+            if (entityType.BaseType == null
+                && !entityType.IsKeyless)
+            {
                 var jObjectProperty = entityTypeBuilder.Property(typeof(JObject), JObjectPropertyName);
                 jObjectProperty.ToJsonProperty("");
                 jObjectProperty.ValueGenerated(ValueGenerated.OnAddOrUpdate);
             }
             else
             {
-                var idProperty = entityType.FindDeclaredProperty(IdPropertyName);
-                if (idProperty != null)
-                {
-                    var key = entityType.FindKey(idProperty);
-                    if (key != null)
-                    {
-                        entityType.Builder.HasNoKey(key);
-                    }
-                }
-
                 var jObjectProperty = entityType.FindDeclaredProperty(JObjectPropertyName);
                 if (jObjectProperty != null)
                 {
-                    entityType.Builder.RemoveUnusedShadowProperties(new[] { jObjectProperty });
+                    entityType.Builder.HasNoUnusedShadowProperties(new[] { jObjectProperty });
                 }
             }
         }
@@ -97,13 +148,30 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
         /// <param name="relationshipBuilder"> The builder for the foreign key. </param>
         /// <param name="context"> Additional information associated with convention execution. </param>
         public virtual void ProcessForeignKeyOwnershipChanged(
-            IConventionRelationshipBuilder relationshipBuilder,
-            IConventionContext<IConventionRelationshipBuilder> context)
+            IConventionForeignKeyBuilder relationshipBuilder,
+            IConventionContext<bool?> context)
         {
             Check.NotNull(relationshipBuilder, nameof(relationshipBuilder));
             Check.NotNull(context, nameof(context));
 
             Process(relationshipBuilder.Metadata.DeclaringEntityType.Builder);
+        }
+
+        /// <summary>
+        ///     Called after a foreign key is removed.
+        /// </summary>
+        /// <param name="entityTypeBuilder"> The builder for the entity type. </param>
+        /// <param name="foreignKey"> The removed foreign key. </param>
+        /// <param name="context"> Additional information associated with convention execution. </param>
+        public virtual void ProcessForeignKeyRemoved(
+            IConventionEntityTypeBuilder entityTypeBuilder,
+            IConventionForeignKey foreignKey,
+            IConventionContext<IConventionForeignKey> context)
+        {
+            if (foreignKey.IsOwnership)
+            {
+                Process(foreignKey.DeclaringEntityType.Builder);
+            }
         }
 
         /// <summary>
@@ -125,7 +193,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             Check.NotEmpty(name, nameof(name));
             Check.NotNull(context, nameof(context));
 
-            if (name == CosmosAnnotationNames.ContainerName)
+            if (name == CosmosAnnotationNames.ContainerName
+                || name == CosmosAnnotationNames.PartitionKeyName)
             {
                 Process(entityTypeBuilder);
             }

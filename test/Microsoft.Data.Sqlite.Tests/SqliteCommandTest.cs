@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite.Properties;
 using Xunit;
-
 using static SQLitePCL.raw;
 
 namespace Microsoft.Data.Sqlite
@@ -34,6 +33,25 @@ namespace Microsoft.Data.Sqlite
                     Assert.Same(transaction, command.Transaction);
                 }
             }
+        }
+
+        [Fact]
+        public void CommandText_defaults_to_empty()
+        {
+            var command = new SqliteCommand();
+
+            Assert.Empty(command.CommandText);
+        }
+
+        [Fact]
+        public void CommandText_coalesces_to_empty()
+        {
+            var command = new SqliteCommand
+            {
+                CommandText = null
+            };
+
+            Assert.Empty(command.CommandText);
         }
 
         [Fact]
@@ -592,6 +610,30 @@ namespace Microsoft.Data.Sqlite
         }
 
         [Fact]
+        public void ExecuteReader_works_on_EXPLAIN()
+        {
+            using (var connection = new SqliteConnection("Data Source=:memory:"))
+            {
+                var command = connection.CreateCommand();
+                command.CommandText = " EXPLAIN SELECT 1 WHERE 1 = @a;";
+                connection.Open();
+
+                if (new Version(connection.ServerVersion) < new Version(3, 28, 0))
+                {
+                    command.Parameters.AddWithValue("@a", 1);
+                }
+
+                using (var reader = command.ExecuteReader())
+                {
+                    var hasData = reader.Read();
+                    Assert.True(hasData);
+                    Assert.Equal(8, reader.FieldCount);
+                    Assert.Equal("Init", reader.GetString(1));
+                }
+            }
+        }
+
+        [Fact]
         public void ExecuteReader_works()
         {
             using (var connection = new SqliteConnection("Data Source=:memory:"))
@@ -886,7 +928,8 @@ namespace Microsoft.Data.Sqlite
             using (var connection = new SqliteConnection("Data Source=:memory:"))
             {
                 connection.Open();
-                connection.ExecuteNonQuery(@"
+                connection.ExecuteNonQuery(
+                    @"
                     CREATE TABLE Test(Value);
                     INSERT INTO Test VALUES(1), (2);");
 
@@ -907,6 +950,27 @@ namespace Microsoft.Data.Sqlite
 
                     Assert.Equal(2L, reader.GetInt64(0));
                 }
+            }
+        }
+
+        [Fact]
+        public void ExecuteReader_works_after_failure()
+        {
+            using (var connection = new SqliteConnection("Data Source=:memory:"))
+            {
+                connection.Open();
+
+                var command = connection.CreateCommand();
+                command.CommandText = "SELECT 1 FROM dual";
+
+                var ex = Assert.Throws<SqliteException>(() => command.ExecuteScalar());
+                Assert.Equal(SQLITE_ERROR, ex.SqliteErrorCode);
+
+                connection.ExecuteNonQuery("CREATE TABLE dual (dummy); INSERT INTO dual (dummy) VALUES ('X');");
+
+                var result = command.ExecuteScalar();
+
+                Assert.Equal(1L, result);
             }
         }
     }

@@ -1,8 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 #if NET461
-
 using System;
 using System.Collections;
 using System.IO;
@@ -25,8 +24,9 @@ namespace Microsoft.EntityFrameworkCore.Tools
             string projectDir,
             string dataDirectory,
             string rootNamespace,
-            string language)
-            : base(assembly, startupAssembly, projectDir, rootNamespace, language)
+            string language,
+            string[] remainingArguments)
+            : base(assembly, startupAssembly, projectDir, rootNamespace, language, remainingArguments)
         {
             var info = new AppDomainSetup { ApplicationBase = AppBasePath };
 
@@ -67,7 +67,8 @@ namespace Microsoft.EntityFrameworkCore.Tools
                         { "projectDir", ProjectDirectory },
                         { "rootNamespace", RootNamespace },
                         { "language", Language },
-                        { "toolsVersion", ProductInfo.GetVersion() }
+                        { "toolsVersion", ProductInfo.GetVersion() },
+                        { "remainingArguments", RemainingArguments }
                     }
                 },
                 null,

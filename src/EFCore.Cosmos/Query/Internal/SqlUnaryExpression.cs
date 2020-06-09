@@ -1,9 +1,11 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using JetBrains.Annotations;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
@@ -20,15 +22,13 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
     {
         private static readonly ISet<ExpressionType> _allowedOperators = new HashSet<ExpressionType>
         {
-            ExpressionType.Not,
-            ExpressionType.Negate,
-            ExpressionType.UnaryPlus,
+            ExpressionType.Not, ExpressionType.Negate, ExpressionType.UnaryPlus
         };
 
         private static ExpressionType VerifyOperator(ExpressionType operatorType)
             => _allowedOperators.Contains(operatorType)
                 ? operatorType
-                : throw new InvalidOperationException("Unsupported Unary operator type specified.");
+                : throw new InvalidOperationException(CoreStrings.UnsupportedUnary);
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -38,9 +38,9 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         /// </summary>
         public SqlUnaryExpression(
             ExpressionType operatorType,
-            SqlExpression operand,
-            Type type,
-            CoreTypeMapping typeMapping)
+            [NotNull] SqlExpression operand,
+            [NotNull] Type type,
+            [CanBeNull] CoreTypeMapping typeMapping)
             : base(type, typeMapping)
         {
             Check.NotNull(operand, nameof(operand));
@@ -64,8 +64,18 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         /// </summary>
         public virtual SqlExpression Operand { get; }
 
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
         protected override Expression VisitChildren(ExpressionVisitor visitor)
-            => Update((SqlExpression)visitor.Visit(Operand));
+        {
+            Check.NotNull(visitor, nameof(visitor));
+
+            return Update((SqlExpression)visitor.Visit(Operand));
+        }
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -73,7 +83,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual SqlUnaryExpression Update(SqlExpression operand)
+        public virtual SqlUnaryExpression Update([NotNull] SqlExpression operand)
             => operand != Operand
                 ? new SqlUnaryExpression(OperatorType, operand, Type, TypeMapping)
                 : this;
@@ -84,13 +94,14 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public override void Print(ExpressionPrinter expressionPrinter)
+        protected override void Print(ExpressionPrinter expressionPrinter)
         {
+            Check.NotNull(expressionPrinter, nameof(expressionPrinter));
 
-            expressionPrinter.StringBuilder.Append(OperatorType);
-            expressionPrinter.StringBuilder.Append("(");
+            expressionPrinter.Append(OperatorType.ToString());
+            expressionPrinter.Append("(");
             expressionPrinter.Visit(Operand);
-            expressionPrinter.StringBuilder.Append(")");
+            expressionPrinter.Append(")");
         }
 
         /// <summary>
@@ -101,14 +112,14 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Query.Internal
         /// </summary>
         public override bool Equals(object obj)
             => obj != null
-            && (ReferenceEquals(this, obj)
-                || obj is SqlUnaryExpression sqlUnaryExpression
-                    && Equals(sqlUnaryExpression));
+               && (ReferenceEquals(this, obj)
+                   || obj is SqlUnaryExpression sqlUnaryExpression
+                   && Equals(sqlUnaryExpression));
 
         private bool Equals(SqlUnaryExpression sqlUnaryExpression)
             => base.Equals(sqlUnaryExpression)
-            && OperatorType == sqlUnaryExpression.OperatorType
-            && Operand.Equals(sqlUnaryExpression.Operand);
+               && OperatorType == sqlUnaryExpression.OperatorType
+               && Operand.Equals(sqlUnaryExpression.Operand);
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to

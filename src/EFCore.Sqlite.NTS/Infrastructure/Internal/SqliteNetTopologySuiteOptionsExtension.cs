@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -51,13 +51,11 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Infrastructure.Internal
             var internalServiceProvider = options.FindExtension<CoreOptionsExtension>()?.InternalServiceProvider;
             if (internalServiceProvider != null)
             {
-                using (var scope = internalServiceProvider.CreateScope())
+                using var scope = internalServiceProvider.CreateScope();
+                var plugins = scope.ServiceProvider.GetService<IEnumerable<IRelationalTypeMappingSourcePlugin>>();
+                if (plugins?.Any(s => s is SqliteNetTopologySuiteTypeMappingSourcePlugin) != true)
                 {
-                    if (scope.ServiceProvider.GetService<IEnumerable<IRelationalTypeMappingSourcePlugin>>()
-                            ?.Any(s => s is SqliteNetTopologySuiteTypeMappingSourcePlugin) != true)
-                    {
-                        throw new InvalidOperationException(SqliteNTSStrings.NTSServicesMissing);
-                    }
+                    throw new InvalidOperationException(SqliteNTSStrings.NTSServicesMissing);
                 }
             }
         }

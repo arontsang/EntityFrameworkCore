@@ -48,11 +48,67 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public virtual IClrCollectionAccessor Create(
-            [NotNull] INavigation navigation,
-            bool forConstruction = false,
-            bool forSet = false)
+        public virtual IClrCollectionAccessor Create([NotNull] INavigation navigation)
+            => !navigation.IsCollection || navigation.IsShadowProperty() ? null : Create(navigation, navigation.TargetEntityType);
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        public virtual IClrCollectionAccessor Create([NotNull] ISkipNavigation navigation)
+            => !navigation.IsCollection || navigation.IsShadowProperty() ? null : Create(navigation, navigation.TargetEntityType);
+
+        private IClrCollectionAccessor Create(IPropertyBase navigation, IEntityType targetType)
         {
+            // ReSharper disable once SuspiciousTypeConversion.Global
+            if (navigation is IClrCollectionAccessor accessor)
+            {
+                return accessor;
+            }
+
+            if (targetType == null)
+            {
+                return null;
+            }
+
+            var memberInfo = GetMostDerivedMemberInfo();
+            var propertyType = memberInfo.GetMemberType();
+            var elementType = propertyType.TryGetElementType(typeof(IEnumerable<>));
+
+            if (elementType == null)
+            {
+                throw new InvalidOperationException(
+                    CoreStrings.NavigationBadType(
+                        navigation.Name,
+                        navigation.DeclaringType.DisplayName(),
+                        propertyType.ShortDisplayName(),
+                        targetType.DisplayName()));
+            }
+
+            if (propertyType.IsArray)
+            {
+                throw new InvalidOperationException(
+                    CoreStrings.NavigationArray(
+                        navigation.Name,
+                        navigation.DeclaringType.DisplayName(),
+                        propertyType.ShortDisplayName()));
+            }
+
+            var boundMethod = _genericCreate.MakeGenericMethod(
+                memberInfo.DeclaringType, propertyType, elementType);
+
+            try
+            {
+                return (IClrCollectionAccessor)boundMethod.Invoke(
+                    null, new object[] { navigation });
+            }
+            catch (TargetInvocationException invocationException)
+            {
+                throw invocationException.InnerException;
+            }
+
             MemberInfo GetMostDerivedMemberInfo()
             {
                 var propertyInfo = navigation.PropertyInfo;
@@ -66,88 +122,66 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
                             ? (MemberInfo)propertyInfo
                             : fieldInfo;
             }
-
-            // ReSharper disable once SuspiciousTypeConversion.Global
-            if (navigation is IClrCollectionAccessor accessor)
-            {
-                return accessor;
-            }
-
-            var memberInfo = GetMostDerivedMemberInfo();
-            var propertyType = memberInfo.GetMemberType();
-            var elementType = propertyType.TryGetElementType(typeof(IEnumerable<>));
-
-            if (elementType == null)
-            {
-                throw new InvalidOperationException(
-                    CoreStrings.NavigationBadType(
-                        navigation.Name,
-                        navigation.DeclaringEntityType.DisplayName(),
-                        propertyType.ShortDisplayName(),
-                        navigation.GetTargetType().DisplayName()));
-            }
-
-            if (propertyType.IsArray)
-            {
-                throw new InvalidOperationException(
-                    CoreStrings.NavigationArray(
-                        navigation.Name,
-                        navigation.DeclaringEntityType.DisplayName(),
-                        propertyType.ShortDisplayName()));
-            }
-
-            var boundMethod = _genericCreate.MakeGenericMethod(
-                memberInfo.DeclaringType, propertyType, elementType);
-
-            return (IClrCollectionAccessor)boundMethod.Invoke(
-                null, new object[]
-                {
-                    navigation, navigation.GetMemberInfo(forConstruction, forSet)
-                });
         }
 
         [UsedImplicitly]
-        private static IClrCollectionAccessor CreateGeneric<TEntity, TCollection, TElement>(INavigation navigation, MemberInfo memberInfo)
+        private static IClrCollectionAccessor CreateGeneric<TEntity, TCollection, TElement>(INavigation navigation)
             where TEntity : class
             where TCollection : class, IEnumerable<TElement>
             where TElement : class
         {
+            Action<TEntity, TCollection> CreateSetterDelegate(
+                ParameterExpression parameterExpression,
+                MemberInfo memberInfo,
+                ParameterExpression valueParameter1)
+                => Expression.Lambda<Action<TEntity, TCollection>>(
+                    Expression.MakeMemberAccess(
+                        parameterExpression,
+                        memberInfo).Assign(
+                        Expression.Convert(
+                            valueParameter1,
+                            memberInfo.GetMemberType())),
+                    parameterExpression,
+                    valueParameter1).Compile();
+
             var entityParameter = Expression.Parameter(typeof(TEntity), "entity");
             var valueParameter = Expression.Parameter(typeof(TCollection), "collection");
 
-            var memberAccess = (Expression)Expression.MakeMemberAccess(entityParameter, memberInfo);
-            if (memberAccess.Type != typeof(TCollection))
+            var memberInfoForRead = navigation.GetMemberInfo(forMaterialization: false, forSet: false);
+            var memberInfoForWrite = navigation.GetMemberInfo(forMaterialization: false, forSet: true);
+            var memberInfoForMaterialization = navigation.GetMemberInfo(forMaterialization: true, forSet: true);
+
+            var memberAccessForRead = (Expression)Expression.MakeMemberAccess(entityParameter, memberInfoForRead);
+            if (memberAccessForRead.Type != typeof(TCollection))
             {
-                memberAccess = Expression.Convert(memberAccess, typeof(TCollection));
+                memberAccessForRead = Expression.Convert(memberAccessForRead, typeof(TCollection));
             }
 
             var getterDelegate = Expression.Lambda<Func<TEntity, TCollection>>(
-                memberAccess,
+                memberAccessForRead,
                 entityParameter).Compile();
 
             Action<TEntity, TCollection> setterDelegate = null;
+            Action<TEntity, TCollection> setterDelegateForMaterialization = null;
             Func<TEntity, Action<TEntity, TCollection>, TCollection> createAndSetDelegate = null;
             Func<TCollection> createDelegate = null;
 
-            var setterMemberInfo = navigation.GetMemberInfo(forConstruction: false, forSet: true);
-            if (setterMemberInfo != null)
+            if (memberInfoForWrite != null)
             {
-                setterDelegate = Expression.Lambda<Action<TEntity, TCollection>>(
-                    Expression.MakeMemberAccess(
-                        entityParameter,
-                        setterMemberInfo).Assign(
-                        Expression.Convert(
-                            valueParameter,
-                            setterMemberInfo.GetMemberType())),
-                    entityParameter,
-                    valueParameter).Compile();
+                setterDelegate = CreateSetterDelegate(entityParameter, memberInfoForWrite, valueParameter);
+            }
+
+            if (memberInfoForMaterialization != null)
+            {
+                setterDelegateForMaterialization = CreateSetterDelegate(entityParameter, memberInfoForMaterialization, valueParameter);
             }
 
             var concreteType = new CollectionTypeFactory().TryFindTypeToInstantiate(typeof(TEntity), typeof(TCollection));
             if (concreteType != null)
             {
                 var isHashSet = concreteType.IsGenericType && concreteType.GetGenericTypeDefinition() == typeof(HashSet<>);
-                if (setterDelegate != null)
+                if (setterDelegate != null
+                    || setterDelegateForMaterialization != null)
                 {
                     if (isHashSet)
                     {
@@ -190,7 +224,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             }
 
             return new ClrICollectionAccessor<TEntity, TCollection, TElement>(
-                navigation.Name, getterDelegate, setterDelegate, createAndSetDelegate, createDelegate);
+                navigation.Name,
+                getterDelegate,
+                setterDelegate,
+                setterDelegateForMaterialization,
+                createAndSetDelegate,
+                createDelegate);
         }
 
         private static bool IsObservableHashSet(Type type)
@@ -223,7 +262,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             where TCollection : class
             where TElement : class
         {
-            var collection = (TCollection)(ICollection<TElement>)new HashSet<TElement>(ReferenceEqualityComparer.Instance);
+            var collection = (TCollection)(ICollection<TElement>)new HashSet<TElement>(LegacyReferenceEqualityComparer.Instance);
             setterDelegate(entity, collection);
             return collection;
         }
@@ -232,7 +271,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         private static TCollection CreateHashSet<TCollection, TElement>()
             where TCollection : class
             where TElement : class
-            => (TCollection)(ICollection<TElement>)new HashSet<TElement>(ReferenceEqualityComparer.Instance);
+            => (TCollection)(ICollection<TElement>)new HashSet<TElement>(LegacyReferenceEqualityComparer.Instance);
 
         [UsedImplicitly]
         private static TCollection CreateAndSetObservableHashSet<TEntity, TCollection, TElement>(
@@ -242,7 +281,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
             where TCollection : class
             where TElement : class
         {
-            var collection = (TCollection)(ICollection<TElement>)new ObservableHashSet<TElement>(ReferenceEqualityComparer.Instance);
+            var collection = (TCollection)(ICollection<TElement>)new ObservableHashSet<TElement>(LegacyReferenceEqualityComparer.Instance);
             setterDelegate(entity, collection);
             return collection;
         }
@@ -251,6 +290,6 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Internal
         private static TCollection CreateObservableHashSet<TCollection, TElement>()
             where TCollection : class
             where TElement : class
-            => (TCollection)(ICollection<TElement>)new ObservableHashSet<TElement>(ReferenceEqualityComparer.Instance);
+            => (TCollection)(ICollection<TElement>)new ObservableHashSet<TElement>(LegacyReferenceEqualityComparer.Instance);
     }
 }

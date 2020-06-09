@@ -93,5 +93,29 @@ namespace Microsoft.EntityFrameworkCore.Utilities
 
             return value;
         }
+
+
+        public static IReadOnlyList<string> HasNoEmptyElements(IReadOnlyList<string> value, [InvokerParameterName][NotNull] string parameterName)
+        {
+            NotNull(value, parameterName);
+
+            if (value.Any(s => string.IsNullOrWhiteSpace(s)))
+            {
+                NotEmpty(parameterName, nameof(parameterName));
+
+                throw new ArgumentException(AbstractionsStrings.CollectionArgumentHasEmptyElements(parameterName));
+            }
+
+            return value;
+        }
+
+        [Conditional("DEBUG")]
+        public static void DebugAssert([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string message)
+        {
+            if (!condition)
+            {
+                throw new Exception($"Check.DebugAssert failed: {message}");
+            }
+        }
     }
 }

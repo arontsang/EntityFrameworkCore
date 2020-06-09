@@ -1,6 +1,9 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System.Linq;
+using Xunit;
+
 namespace Microsoft.EntityFrameworkCore
 {
     public abstract class ConvertToProviderTypesTestBase<TFixture> : BuiltInDataTypesTestBase<TFixture>
@@ -10,6 +13,28 @@ namespace Microsoft.EntityFrameworkCore
             : base(fixture)
         {
         }
+
+        [ConditionalFact]
+        public virtual void Equals_method_over_enum_works()
+        {
+            using var context = CreateContext();
+
+            var query = context.Set<BuiltInDataTypes>().Where(t => t.Id == -1 && t.Enum8.Equals(Enum8.SomeValue)).ToList();
+
+            Assert.Empty(query);
+        }
+
+        [ConditionalFact]
+        public virtual void Object_equals_method_over_enum_works()
+        {
+            using var context = CreateContext();
+
+            var query = context.Set<BuiltInDataTypes>().Where(t => t.Id == -1 && Equals(t.Enum8, Enum8.SomeValue)).ToList();
+
+            Assert.Empty(query);
+        }
+
+        public override void Object_to_string_conversion() {}
 
         public abstract class ConvertToProviderTypesFixtureBase : BuiltInDataTypesFixtureBase
         {
@@ -152,6 +177,12 @@ namespace Microsoft.EntityFrameworkCore
                         b.Property(e => e.String9000).HasConversion<byte[]>();
                         b.Property(e => e.ByteArray5).HasConversion<string>().HasMaxLength(8);
                         b.Property(e => e.ByteArray9000).HasConversion<string>().HasMaxLength(LongStringLength * 2);
+                    });
+
+                modelBuilder.Entity<AnimalIdentification>(
+                    b =>
+                    {
+                        b.Property(e => e.Method).HasConversion<string>().HasMaxLength(6);
                     });
             }
         }

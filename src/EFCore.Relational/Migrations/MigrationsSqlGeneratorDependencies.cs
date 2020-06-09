@@ -28,8 +28,8 @@ namespace Microsoft.EntityFrameworkCore.Migrations
     ///         services using the 'With...' methods. Do not call the constructor at any point in this process.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -62,6 +62,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             [NotNull] ISqlGenerationHelper sqlGenerationHelper,
             [NotNull] IRelationalTypeMappingSource typeMappingSource,
             [NotNull] ICurrentDbContext currentContext,
+            [NotNull] ILoggingOptions loggingOptions,
             [NotNull] IDiagnosticsLogger<DbLoggerCategory.Database.Command> logger)
         {
             Check.NotNull(commandBuilderFactory, nameof(commandBuilderFactory));
@@ -69,6 +70,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             Check.NotNull(sqlGenerationHelper, nameof(sqlGenerationHelper));
             Check.NotNull(typeMappingSource, nameof(typeMappingSource));
             Check.NotNull(currentContext, nameof(currentContext));
+            Check.NotNull(loggingOptions, nameof(loggingOptions));
             Check.NotNull(logger, nameof(logger));
 
             CommandBuilderFactory = commandBuilderFactory;
@@ -76,6 +78,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             UpdateSqlGenerator = updateSqlGenerator;
             TypeMappingSource = typeMappingSource;
             CurrentContext = currentContext;
+            LoggingOptions = loggingOptions;
             Logger = logger;
         }
 
@@ -100,12 +103,17 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         public IRelationalTypeMappingSource TypeMappingSource { get; }
 
         /// <summary>
-        ///    Contains the <see cref="DbContext"/> currently in use.
+        ///     Contains the <see cref="DbContext" /> currently in use.
         /// </summary>
         public ICurrentDbContext CurrentContext { get; }
 
         /// <summary>
-        ///     A logger.
+        ///     The logging options.
+        /// </summary>
+        public ILoggingOptions LoggingOptions { get; }
+
+        /// <summary>
+        ///     The database command logger.
         /// </summary>
         public IDiagnosticsLogger<DbLoggerCategory.Database.Command> Logger { get; }
 
@@ -121,6 +129,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 SqlGenerationHelper,
                 TypeMappingSource,
                 CurrentContext,
+                LoggingOptions,
                 Logger);
 
         /// <summary>
@@ -135,6 +144,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 SqlGenerationHelper,
                 TypeMappingSource,
                 CurrentContext,
+                LoggingOptions,
                 Logger);
 
         /// <summary>
@@ -149,6 +159,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 sqlGenerationHelper,
                 TypeMappingSource,
                 CurrentContext,
+                LoggingOptions,
                 Logger);
 
         /// <summary>
@@ -163,6 +174,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 SqlGenerationHelper,
                 typeMappingSource,
                 CurrentContext,
+                LoggingOptions,
                 Logger);
 
         /// <summary>
@@ -177,6 +189,22 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 SqlGenerationHelper,
                 TypeMappingSource,
                 currentContext,
+                LoggingOptions,
+                Logger);
+
+        /// <summary>
+        ///     Clones this dependency parameter object with one service replaced.
+        /// </summary>
+        /// <param name="loggingOptions"> A replacement for the current dependency of this type. </param>
+        /// <returns> A new parameter object with the given service replaced. </returns>
+        public MigrationsSqlGeneratorDependencies With([NotNull] ILoggingOptions loggingOptions)
+            => new MigrationsSqlGeneratorDependencies(
+                CommandBuilderFactory,
+                UpdateSqlGenerator,
+                SqlGenerationHelper,
+                TypeMappingSource,
+                CurrentContext,
+                loggingOptions,
                 Logger);
 
         /// <summary>
@@ -191,6 +219,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
                 SqlGenerationHelper,
                 TypeMappingSource,
                 CurrentContext,
+                LoggingOptions,
                 logger);
     }
 }

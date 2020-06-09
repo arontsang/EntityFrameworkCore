@@ -17,9 +17,9 @@ namespace Microsoft.EntityFrameworkCore.Storage.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/>. This means a single instance
-    ///         is used by many <see cref="DbContext"/> instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public class RawSqlCommandBuilder : IRawSqlCommandBuilder
@@ -85,7 +85,7 @@ namespace Microsoft.EntityFrameworkCore.Storage.Internal
                         dbParameter.ParameterName = _sqlGenerationHelper.GenerateParameterName(parameterNameGenerator.GenerateNext());
                     }
 
-                    substitutions.Add(dbParameter.ParameterName);
+                    substitutions.Add(_sqlGenerationHelper.GenerateParameterName(dbParameter.ParameterName));
                     relationalCommandBuilder.AddRawParameter(dbParameter.ParameterName, dbParameter);
                 }
                 else

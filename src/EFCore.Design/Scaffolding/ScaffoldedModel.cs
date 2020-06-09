@@ -1,8 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections.Generic;
 using JetBrains.Annotations;
+
+#nullable enable
 
 namespace Microsoft.EntityFrameworkCore.Scaffolding
 {
@@ -15,7 +17,7 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding
         ///     Gets or sets the generated file containing the <see cref="DbContext" />.
         /// </summary>
         /// <value> The generated file containing the <see cref="DbContext" />. </value>
-        public virtual ScaffoldedFile ContextFile { get; [param: NotNull] set; }
+        public virtual ScaffoldedFile? ContextFile { get; [param: NotNull] set; }
 
         /// <summary>
         ///     Gets any additional generated files for the model.

@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
 
 namespace Microsoft.EntityFrameworkCore.Migrations
@@ -33,7 +33,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
             {
                 IModel Create()
                 {
-                    var modelBuilder = new ModelBuilder(new ConventionSet());
+                    var modelBuilder = new ModelBuilder();
                     BuildTargetModel(modelBuilder);
 
                     return modelBuilder.Model;
@@ -81,7 +81,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         public virtual string ActiveProvider { get; [param: NotNull] set; }
 
         /// <summary>
-        ///     Implemented to builds the <see cref="TargetModel" />.
+        ///     Implemented to build the <see cref="TargetModel" />.
         /// </summary>
         /// <param name="modelBuilder"> The <see cref="ModelBuilder" /> to use to build the model. </param>
         protected virtual void BuildTargetModel([NotNull] ModelBuilder modelBuilder)

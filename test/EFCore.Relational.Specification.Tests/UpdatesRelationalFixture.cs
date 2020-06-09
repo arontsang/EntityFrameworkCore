@@ -14,6 +14,10 @@ namespace Microsoft.EntityFrameworkCore
         {
             base.OnModelCreating(modelBuilder, context);
 
+            modelBuilder.Entity<ProductViewTable>().HasBaseType((string)null).ToTable("ProductView");
+            modelBuilder.Entity<ProductTableWithView>().HasBaseType((string)null).ToView("ProductView").ToTable("ProductTable");
+            modelBuilder.Entity<ProductTableView>().HasBaseType((string)null).ToView("ProductTable");
+
             modelBuilder
                 .Entity<
                     LoginEntityTypeWithAnExtremelyLongAndOverlyConvolutedNameThatIsUsedToVerifyThatTheStoreIdentifierGenerationLengthLimitIsWorkingCorrectlyDetails
@@ -21,16 +25,12 @@ namespace Microsoft.EntityFrameworkCore
                     eb =>
                     {
                         eb.HasKey(
-                            l => new
-                            {
-                                l.ProfileId
-                            })
+                                l => new { l.ProfileId })
                             .HasName("PK_LoginDetails");
 
                         eb.HasOne(d => d.Login).WithOne()
-                          .HasConstraintName("FK_LoginDetails_Login");
+                            .HasConstraintName("FK_LoginDetails_Login");
                     });
-
         }
     }
 }

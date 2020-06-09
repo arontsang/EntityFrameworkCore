@@ -41,6 +41,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Internal
             base.Validate(model, logger);
 
             ValidateSharedContainerCompatibility(model, logger);
+            ValidateOnlyETagConcurrencyToken(model, logger);
         }
 
         /// <summary>
@@ -56,7 +57,11 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Internal
             var containers = new Dictionary<string, List<IEntityType>>();
             foreach (var entityType in model.GetEntityTypes().Where(et => et.FindPrimaryKey() != null))
             {
-                var container = entityType.GetCosmosContainer();
+                var container = entityType.GetContainer();
+                if (container == null)
+                {
+                    continue;
+                }
 
                 if (!containers.TryGetValue(container, out var mappedTypes))
                 {
@@ -91,7 +96,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Internal
             IEntityType firstEntityType = null;
             foreach (var entityType in mappedTypes)
             {
-                var partitionKeyPropertyName = entityType.GetCosmosPartitionKeyPropertyName();
+                var partitionKeyPropertyName = entityType.GetPartitionKeyPropertyName();
                 if (partitionKeyPropertyName != null)
                 {
                     var nextPartitionKeyProperty = entityType.FindProperty(partitionKeyPropertyName);
@@ -102,11 +107,12 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Internal
                     }
 
                     var keyType = nextPartitionKeyProperty.GetTypeMapping().Converter?.ProviderClrType
-                        ?? nextPartitionKeyProperty.ClrType;
+                                  ?? nextPartitionKeyProperty.ClrType;
                     if (keyType != typeof(string))
                     {
-                        throw new InvalidOperationException(CosmosStrings.PartitionKeyNonStringStoreType(
-                            partitionKeyPropertyName, entityType.DisplayName(), keyType.ShortDisplayName()));
+                        throw new InvalidOperationException(
+                            CosmosStrings.PartitionKeyNonStringStoreType(
+                                partitionKeyPropertyName, entityType.DisplayName(), keyType.ShortDisplayName()));
                     }
 
                     if (partitionKey == null)
@@ -115,14 +121,15 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Internal
                         {
                             throw new InvalidOperationException(CosmosStrings.NoPartitionKey(firstEntityType.DisplayName(), container));
                         }
+
                         partitionKey = nextPartitionKeyProperty;
                     }
-                    else if (partitionKey.GetCosmosPropertyName() != nextPartitionKeyProperty.GetCosmosPropertyName())
+                    else if (partitionKey.GetJsonPropertyName() != nextPartitionKeyProperty.GetJsonPropertyName())
                     {
                         throw new InvalidOperationException(
                             CosmosStrings.PartitionKeyStoreNameMismatch(
-                                partitionKey.Name, firstEntityType.DisplayName(), partitionKey.GetCosmosPropertyName(),
-                                nextPartitionKeyProperty.Name, entityType.DisplayName(), nextPartitionKeyProperty.GetCosmosPropertyName()));
+                                partitionKey.Name, firstEntityType.DisplayName(), partitionKey.GetJsonPropertyName(),
+                                nextPartitionKeyProperty.Name, entityType.DisplayName(), nextPartitionKeyProperty.GetJsonPropertyName()));
                     }
                 }
                 else if (partitionKey != null)
@@ -141,7 +148,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Internal
                 }
 
                 if (entityType.ClrType?.IsInstantiable() == true
-                    && entityType.GetCosmosContainingPropertyName() == null)
+                    && entityType.GetContainingPropertyName() == null)
                 {
                     if (entityType.GetDiscriminatorProperty() == null)
                     {
@@ -164,6 +171,41 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.Internal
                     }
 
                     discriminatorValues[discriminatorValue] = entityType;
+                }
+            }
+        }
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        protected virtual void ValidateOnlyETagConcurrencyToken(
+            [NotNull] IModel model,
+            [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        {
+            foreach (var entityType in model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetDeclaredProperties())
+                {
+                    if (property.IsConcurrencyToken)
+                    {
+                        var storeName = property.GetJsonPropertyName();
+                        if (storeName != "_etag")
+                        {
+                            throw new InvalidOperationException(
+                                CosmosStrings.NonETagConcurrencyToken(entityType.DisplayName(), storeName));
+                        }
+
+                        var etagType = property.GetTypeMapping().Converter?.ProviderClrType ?? property.ClrType;
+                        if (etagType != typeof(string))
+                        {
+                            throw new InvalidOperationException(
+                                CosmosStrings.ETagNonStringStoreType(
+                                    property.Name, entityType.DisplayName(), etagType.ShortDisplayName()));
+                        }
+                    }
                 }
             }
         }

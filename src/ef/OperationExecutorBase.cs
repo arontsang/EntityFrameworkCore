@@ -1,6 +1,7 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -21,13 +22,15 @@ namespace Microsoft.EntityFrameworkCore.Tools
         protected string ProjectDirectory { get; }
         protected string RootNamespace { get; }
         protected string Language { get; }
+        protected string[] RemainingArguments { get; }
 
         protected OperationExecutorBase(
             string assembly,
             string startupAssembly,
             string projectDir,
             string rootNamespace,
-            string language)
+            string language,
+            string[] remainingArguments)
         {
             AssemblyFileName = Path.GetFileNameWithoutExtension(assembly);
             StartupAssemblyFileName = startupAssembly == null
@@ -40,6 +43,7 @@ namespace Microsoft.EntityFrameworkCore.Tools
             RootNamespace = rootNamespace ?? AssemblyFileName;
             ProjectDirectory = projectDir ?? Directory.GetCurrentDirectory();
             Language = language;
+            RemainingArguments = remainingArguments ?? Array.Empty<string>();
 
             Reporter.WriteVerbose(Resources.UsingAssembly(AssemblyFileName));
             Reporter.WriteVerbose(Resources.UsingStartupAssembly(StartupAssemblyFileName));
@@ -47,6 +51,7 @@ namespace Microsoft.EntityFrameworkCore.Tools
             Reporter.WriteVerbose(Resources.UsingWorkingDirectory(Directory.GetCurrentDirectory()));
             Reporter.WriteVerbose(Resources.UsingRootNamespace(RootNamespace));
             Reporter.WriteVerbose(Resources.UsingProjectDir(ProjectDirectory));
+            Reporter.WriteVerbose(Resources.RemainingArguments(string.Join(",", RemainingArguments)));
         }
 
         public virtual void Dispose()
@@ -82,55 +87,44 @@ namespace Microsoft.EntityFrameworkCore.Tools
             return resultHandler.Result;
         }
 
-        public IDictionary AddMigration(string name, string outputDir, string contextType)
+        public IDictionary AddMigration(string name, string outputDir, string contextType, string @namespace)
             => InvokeOperation<IDictionary>(
                 "AddMigration",
-                new Dictionary<string, string>
+                new Dictionary<string, object>
                 {
                     ["name"] = name,
                     ["outputDir"] = outputDir,
-                    ["contextType"] = contextType
+                    ["contextType"] = contextType,
+                    ["namespace"] = @namespace
                 });
 
         public IDictionary RemoveMigration(string contextType, bool force)
             => InvokeOperation<IDictionary>(
                 "RemoveMigration",
-                new Dictionary<string, object>
-                {
-                    ["contextType"] = contextType,
-                    ["force"] = force
-                });
+                new Dictionary<string, object> { ["contextType"] = contextType, ["force"] = force });
 
         public IEnumerable<IDictionary> GetMigrations(string contextType)
             => InvokeOperation<IEnumerable<IDictionary>>(
                 "GetMigrations",
-                new Dictionary<string, object>
-                {
-                    ["contextType"] = contextType
-                });
+                new Dictionary<string, object> { ["contextType"] = contextType });
 
         public void DropDatabase(string contextType)
             => InvokeOperation(
                 "DropDatabase",
-                new Dictionary<string, object>
-                {
-                    ["contextType"] = contextType
-                });
+                new Dictionary<string, object> { ["contextType"] = contextType });
 
         public IDictionary GetContextInfo(string name)
             => InvokeOperation<IDictionary>(
                 "GetContextInfo",
-                new Dictionary<string, object>
-                {
-                    ["contextType"] = name
-                });
+                new Dictionary<string, object> { ["contextType"] = name });
 
-        public void UpdateDatabase(string migration, string contextType)
+        public void UpdateDatabase(string migration, string connectionString, string contextType)
             => InvokeOperation(
                 "UpdateDatabase",
-                new Dictionary<string, string>
+                new Dictionary<string, object>
                 {
                     ["targetMigration"] = migration,
+                    ["connectionString"] = connectionString,
                     ["contextType"] = contextType
                 });
 
@@ -147,7 +141,10 @@ namespace Microsoft.EntityFrameworkCore.Tools
             IEnumerable<string> tableFilters,
             bool useDataAnnotations,
             bool overwriteFiles,
-            bool useDatabaseNames)
+            bool useDatabaseNames,
+            string modelNamespace,
+            string contextNamespace,
+            bool suppressOnConfiguring)
             => InvokeOperation<IDictionary>(
                 "ScaffoldContext",
                 new Dictionary<string, object>
@@ -161,7 +158,10 @@ namespace Microsoft.EntityFrameworkCore.Tools
                     ["tableFilters"] = tableFilters,
                     ["useDataAnnotations"] = useDataAnnotations,
                     ["overwriteFiles"] = overwriteFiles,
-                    ["useDatabaseNames"] = useDatabaseNames
+                    ["useDatabaseNames"] = useDatabaseNames,
+                    ["modelNamespace"] = modelNamespace,
+                    ["contextNamespace"] = contextNamespace,
+                    ["suppressOnConfiguring"] = suppressOnConfiguring
                 });
 
         public string ScriptMigration(
@@ -182,9 +182,6 @@ namespace Microsoft.EntityFrameworkCore.Tools
         public string ScriptDbContext(string contextType)
             => InvokeOperation<string>(
                 "ScriptDbContext",
-                new Dictionary<string, object>
-                {
-                    ["contextType"] = contextType
-                });
+                new Dictionary<string, object> { ["contextType"] = contextType });
     }
 }

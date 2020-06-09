@@ -18,36 +18,15 @@ namespace Microsoft.EntityFrameworkCore.Metadata
                 .Property(e => e.Geometry)
                 .Metadata;
 
-            Assert.Null(property.GetSqliteSrid());
+            Assert.Null(property.GetSrid());
 
-            property.SetSqliteSrid(1);
+            property.SetSrid(1);
 
-            Assert.Equal(1, property.GetSqliteSrid());
+            Assert.Equal(1, property.GetSrid());
 
-            property.SetSqliteSrid(null);
+            property.SetSrid(null);
 
-            Assert.Null(property.GetSqliteSrid());
-        }
-
-        [ConditionalFact]
-        public void Can_get_and_set_dimension()
-        {
-            var modelBuilder = new ModelBuilder(new ConventionSet());
-
-            var property = modelBuilder
-                .Entity<Customer>()
-                .Property(e => e.Geometry)
-                .Metadata;
-
-            Assert.Null(property.GetSqliteDimension());
-
-            property.SetSqliteDimension("Z");
-
-            Assert.Equal("Z", property.GetSqliteDimension());
-
-            property.SetSqliteDimension(null);
-
-            Assert.Null(property.GetSqliteDimension());
+            Assert.Null(property.GetSrid());
         }
 
         private class Customer

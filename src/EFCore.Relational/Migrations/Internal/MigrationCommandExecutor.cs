@@ -1,11 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,9 +19,9 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/>. This means a single instance
-    ///         is used by many <see cref="DbContext"/> instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public class MigrationCommandExecutor : IMigrationCommandExecutor
@@ -100,7 +99,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Internal
             var transactionScope = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
             try
             {
-                await connection.OpenAsync(cancellationToken);
+                await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
                 try
                 {
@@ -113,38 +112,43 @@ namespace Microsoft.EntityFrameworkCore.Migrations.Internal
                             if (transaction == null
                                 && !command.TransactionSuppressed)
                             {
-                                transaction = await connection.BeginTransactionAsync(cancellationToken);
+                                transaction = await connection.BeginTransactionAsync(cancellationToken)
+                                    .ConfigureAwait(false);
                             }
 
                             if (transaction != null
                                 && command.TransactionSuppressed)
                             {
-                                transaction.Commit();
-                                await transaction.DisposeAsync();
+                                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                                await transaction.DisposeAsync().ConfigureAwait(false);
                                 transaction = null;
                             }
 
-                            await command.ExecuteNonQueryAsync(connection, cancellationToken: cancellationToken);
+                            await command.ExecuteNonQueryAsync(connection, cancellationToken: cancellationToken)
+                                .ConfigureAwait(false);
                         }
 
-                        transaction?.Commit();
+                        if (transaction != null)
+                        {
+                            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+                        }
                     }
                     finally
                     {
                         if (transaction != null)
                         {
-                            await transaction.DisposeAsync();
+                            await transaction.DisposeAsync().ConfigureAwait(false);
                         }
                     }
                 }
                 finally
                 {
-                    await connection.CloseAsync();
+                    await connection.CloseAsync().ConfigureAwait(false);
                 }
             }
             finally
             {
-                await transactionScope.DisposeAsyncIfAvailable();
+                await transactionScope.DisposeAsyncIfAvailable().ConfigureAwait(false);
             }
         }
     }

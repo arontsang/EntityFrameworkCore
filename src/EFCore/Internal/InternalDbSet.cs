@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -25,13 +25,15 @@ namespace Microsoft.EntityFrameworkCore.Internal
     ///     doing so can result in application failures when updating to a new Entity Framework Core release.
     /// </summary>
     public class InternalDbSet<TEntity> :
-#pragma warning disable CS0618 // Type or member is obsolete
-        DbQuery<TEntity>,
-#pragma warning restore CS0618 // Type or member is obsolete
-        IQueryable<TEntity>, IAsyncEnumerable<TEntity>, IInfrastructure<IServiceProvider>, IResettableService
+        DbSet<TEntity>,
+        IQueryable<TEntity>,
+        IAsyncEnumerable<TEntity>,
+        IInfrastructure<IServiceProvider>,
+        IResettableService
         where TEntity : class
     {
         private readonly DbContext _context;
+        private readonly string _entityTypeName;
         private IEntityType _entityType;
         private EntityQueryable<TEntity> _entityQueryable;
         private LocalView<TEntity> _localView;
@@ -42,13 +44,14 @@ namespace Microsoft.EntityFrameworkCore.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        public InternalDbSet([NotNull] DbContext context)
+        public InternalDbSet([NotNull] DbContext context, [CanBeNull] string entityTypeName)
         {
             Check.NotNull(context, nameof(context));
 
             // Just storing context/service locator here so that the context will be initialized by the time the
             // set is used and services will be obtained from the correctly scoped container when this happens.
             _context = context;
+            _entityTypeName = entityTypeName;
         }
 
         private IEntityType EntityType
@@ -60,7 +63,9 @@ namespace Microsoft.EntityFrameworkCore.Internal
                     return _entityType;
                 }
 
-                _entityType = _context.Model.FindEntityType(typeof(TEntity));
+                _entityType = _entityTypeName != null
+                    ? _context.Model.FindEntityType(_entityTypeName)
+                    : _context.Model.FindEntityType(typeof(TEntity));
 
                 if (_entityType == null)
                 {
@@ -111,18 +116,7 @@ namespace Microsoft.EntityFrameworkCore.Internal
         }
 
         private EntityQueryable<TEntity> CreateEntityQueryable()
-        {
-            var queryable = new EntityQueryable<TEntity>(_context.GetDependencies().QueryProvider);
-
-#pragma warning disable 618
-            if (_entityType.FindPrimaryKey() == null)
-#pragma warning restore 618
-            {
-                queryable = (EntityQueryable<TEntity>)queryable.AsNoTracking();
-            }
-
-            return queryable;
-        }
+            => new EntityQueryable<TEntity>(_context.GetDependencies().QueryProvider, EntityType);
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to

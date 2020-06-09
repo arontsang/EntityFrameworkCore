@@ -1,7 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using JetBrains.Annotations;
+
+#nullable enable
 
 namespace Microsoft.EntityFrameworkCore.Scaffolding.Metadata.Internal
 {
@@ -20,6 +22,6 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding.Metadata.Internal
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         public static string DisplayName([NotNull] this DatabaseTable table)
-            => !string.IsNullOrEmpty(table.Schema) ? table.Schema + "." + table.Name : table.Name;
+            => !string.IsNullOrEmpty(table.Schema) ? table.Schema + "." + table.Name : (table.Name ?? "<UNKNOWN>");
     }
 }

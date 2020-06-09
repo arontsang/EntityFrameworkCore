@@ -16,8 +16,8 @@ namespace Microsoft.EntityFrameworkCore.Storage
     ///         not used in application code.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -29,7 +29,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         ///     contains the schema for the current model.
         /// </summary>
         /// <returns>
-        ///     True if the database exists; otherwise false.
+        ///     <see langword="true"/> if the database exists; otherwise <see langword="false"/>. 
         /// </returns>
         bool Exists();
 
@@ -42,7 +42,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         /// </param>
         /// <returns>
         ///     A task that represents the asynchronous operation. The task result contains
-        ///     true if the database exists; otherwise false.
+        ///     <see langword="true"/> if the database exists; otherwise <see langword="false"/>. 
         /// </returns>
         Task<bool> ExistsAsync(CancellationToken cancellationToken = default);
 

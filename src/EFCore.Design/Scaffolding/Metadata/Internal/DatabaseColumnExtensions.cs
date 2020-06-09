@@ -1,10 +1,12 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System.Linq;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+
+#nullable enable
 
 namespace Microsoft.EntityFrameworkCore.Scaffolding.Metadata.Internal
 {
@@ -36,7 +38,7 @@ namespace Microsoft.EntityFrameworkCore.Scaffolding.Metadata.Internal
         /// </summary>
         public static bool IsKeyOrIndex([NotNull] this DatabaseColumn column)
         {
-            var table = column.Table;
+            var table = column.Table!;
 
             if (table.PrimaryKey?.Columns.Contains(column) == true)
             {

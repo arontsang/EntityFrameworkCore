@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 using JetBrains.Annotations;
-using Microsoft.Data.SqlClient; // Note: Hard reference to SqlClient here.
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.EntityFrameworkCore.SqlServer.Internal;
@@ -24,8 +24,8 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -97,12 +97,14 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
             using (var masterConnection = _connection.CreateMasterConnection())
             {
                 await Dependencies.MigrationCommandExecutor
-                    .ExecuteNonQueryAsync(CreateCreateOperations(), masterConnection, cancellationToken);
+                    .ExecuteNonQueryAsync(CreateCreateOperations(), masterConnection, cancellationToken)
+                    .ConfigureAwait(false);
 
                 ClearPool();
             }
 
-            await ExistsAsync(retryOnNotExists: true, cancellationToken: cancellationToken);
+            await ExistsAsync(retryOnNotExists: true, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
         }
 
         /// <summary>
@@ -117,12 +119,14 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
                 .Execute(
                     _connection,
                     connection => (int)CreateHasTablesCommand()
-                                      .ExecuteScalar(
-                                          new RelationalCommandParameterObject(
-                                              connection,
-                                              null,
-                                              Dependencies.CurrentContext.Context,
-                                              Dependencies.CommandLogger)) != 0);
+                            .ExecuteScalar(
+                                new RelationalCommandParameterObject(
+                                    connection,
+                                    null,
+                                    null,
+                                    Dependencies.CurrentContext.Context,
+                                    Dependencies.CommandLogger))
+                        != 0);
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -134,17 +138,21 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Storage.Internal
             => Dependencies.ExecutionStrategyFactory.Create().ExecuteAsync(
                 _connection,
                 async (connection, ct) => (int)await CreateHasTablesCommand()
-                                              .ExecuteScalarAsync(
-                                                  new RelationalCommandParameterObject(
-                                                      connection,
-                                                      null,
-                                                      Dependencies.CurrentContext.Context,
-                                                      Dependencies.CommandLogger),
-                                                  cancellationToken: ct) != 0, cancellationToken);
+                        .ExecuteScalarAsync(
+                            new RelationalCommandParameterObject(
+                                connection,
+                                null,
+                                null,
+                                Dependencies.CurrentContext.Context,
+                                Dependencies.CommandLogger),
+                            cancellationToken: ct)
+                        .ConfigureAwait(false)
+                    != 0, cancellationToken);
 
         private IRelationalCommand CreateHasTablesCommand()
             => _rawSqlCommandBuilder
-                .Build(@"
+                .Build(
+                    @"
 IF EXISTS
     (SELECT *
      FROM [sys].[objects] o
@@ -169,7 +177,8 @@ SELECT 1 ELSE SELECT 0");
                     new SqlServerCreateDatabaseOperation
                     {
                         Name = builder.InitialCatalog,
-                        FileName = builder.AttachDBFilename
+                        FileName = builder.AttachDBFilename,
+                        Collation = Dependencies.Model.GetCollation()
                     }
                 });
         }
@@ -189,13 +198,22 @@ SELECT 1 ELSE SELECT 0");
                 {
                     while (true)
                     {
+                        var opened = false;
                         try
                         {
-                            using (new TransactionScope(TransactionScopeOption.Suppress))
-                            {
-                                _connection.Open(errorsExpected: true);
-                                _connection.Close();
-                            }
+                            using var _ = new TransactionScope(TransactionScopeOption.Suppress);
+                            _connection.Open(errorsExpected: true);
+                            opened = true;
+
+                            _rawSqlCommandBuilder
+                                .Build("SELECT 1")
+                                .ExecuteNonQuery(
+                                    new RelationalCommandParameterObject(
+                                        _connection,
+                                        null,
+                                        null,
+                                        Dependencies.CurrentContext.Context,
+                                        Dependencies.CommandLogger));
 
                             return true;
                         }
@@ -215,6 +233,13 @@ SELECT 1 ELSE SELECT 0");
 
                             Thread.Sleep(RetryDelay);
                         }
+                        finally
+                        {
+                            if (opened)
+                            {
+                                _connection.Close();
+                            }
+                        }
                     }
                 });
 
@@ -233,14 +258,25 @@ SELECT 1 ELSE SELECT 0");
                 {
                     while (true)
                     {
+                        var opened = false;
+
                         try
                         {
-                            using (new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
-                            {
-                                await _connection.OpenAsync(ct, errorsExpected: true);
+                            using var _ = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled);
+                            await _connection.OpenAsync(ct, errorsExpected: true).ConfigureAwait(false);
+                            opened = true;
 
-                                await _connection.CloseAsync();
-                            }
+                            await _rawSqlCommandBuilder
+                                .Build("SELECT 1")
+                                .ExecuteNonQueryAsync(
+                                    new RelationalCommandParameterObject(
+                                        _connection,
+                                        null,
+                                        null,
+                                        Dependencies.CurrentContext.Context,
+                                        Dependencies.CommandLogger),
+                                    ct)
+                                .ConfigureAwait(false);
 
                             return true;
                         }
@@ -258,7 +294,14 @@ SELECT 1 ELSE SELECT 0");
                                 throw;
                             }
 
-                            await Task.Delay(RetryDelay, ct);
+                            await Task.Delay(RetryDelay, ct).ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            if (opened)
+                            {
+                                await _connection.CloseAsync().ConfigureAwait(false);
+                            }
                         }
                     }
                 }, cancellationToken);
@@ -313,11 +356,9 @@ SELECT 1 ELSE SELECT 0");
         {
             ClearAllPools();
 
-            using (var masterConnection = _connection.CreateMasterConnection())
-            {
-                Dependencies.MigrationCommandExecutor
-                    .ExecuteNonQuery(CreateDropCommands(), masterConnection);
-            }
+            using var masterConnection = _connection.CreateMasterConnection();
+            Dependencies.MigrationCommandExecutor
+                .ExecuteNonQuery(CreateDropCommands(), masterConnection);
         }
 
         /// <summary>
@@ -330,11 +371,10 @@ SELECT 1 ELSE SELECT 0");
         {
             ClearAllPools();
 
-            using (var masterConnection = _connection.CreateMasterConnection())
-            {
-                await Dependencies.MigrationCommandExecutor
-                    .ExecuteNonQueryAsync(CreateDropCommands(), masterConnection, cancellationToken);
-            }
+            using var masterConnection = _connection.CreateMasterConnection();
+            await Dependencies.MigrationCommandExecutor
+                .ExecuteNonQueryAsync(CreateDropCommands(), masterConnection, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         private IReadOnlyList<MigrationCommand> CreateDropCommands()
@@ -345,13 +385,7 @@ SELECT 1 ELSE SELECT 0");
                 throw new InvalidOperationException(SqlServerStrings.NoInitialCatalog);
             }
 
-            var operations = new MigrationOperation[]
-            {
-                new SqlServerDropDatabaseOperation
-                {
-                    Name = databaseName
-                }
-            };
+            var operations = new MigrationOperation[] { new SqlServerDropDatabaseOperation { Name = databaseName } };
 
             return Dependencies.MigrationsSqlGenerator.Generate(operations);
         }

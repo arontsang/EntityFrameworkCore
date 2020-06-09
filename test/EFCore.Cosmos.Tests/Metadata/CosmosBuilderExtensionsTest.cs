@@ -17,16 +17,16 @@ namespace Microsoft.EntityFrameworkCore.Metadata
             var entityType = modelBuilder
                 .Entity<Customer>();
 
-            Assert.Equal(nameof(DbContext), entityType.Metadata.GetCosmosContainer());
+            Assert.Equal(nameof(DbContext), entityType.Metadata.GetContainer());
 
             entityType.ToContainer("Customizer");
-            Assert.Equal("Customizer", entityType.Metadata.GetCosmosContainer());
+            Assert.Equal("Customizer", entityType.Metadata.GetContainer());
 
             entityType.ToContainer(null);
-            Assert.Equal(nameof(DbContext), entityType.Metadata.GetCosmosContainer());
+            Assert.Equal(nameof(DbContext), entityType.Metadata.GetContainer());
 
             modelBuilder.HasDefaultContainer("Unicorn");
-            Assert.Equal("Unicorn", entityType.Metadata.GetCosmosContainer());
+            Assert.Equal("Unicorn", entityType.Metadata.GetContainer());
         }
 
         [ConditionalFact]
@@ -38,20 +38,22 @@ namespace Microsoft.EntityFrameworkCore.Metadata
             var entityType = entityTypeBuilder.Metadata;
 
             ((IConventionEntityType)entityType).Builder.HasPartitionKey("pk");
-            Assert.Equal("pk", entityType.GetCosmosPartitionKeyPropertyName());
-            Assert.Equal(ConfigurationSource.Convention,
-                ((IConventionEntityType)entityType).GetCosmosPartitionKeyPropertyNameConfigurationSource());
+            Assert.Equal("pk", entityType.GetPartitionKeyPropertyName());
+            Assert.Equal(
+                ConfigurationSource.Convention,
+                ((IConventionEntityType)entityType).GetPartitionKeyPropertyNameConfigurationSource());
 
             entityTypeBuilder.HasPartitionKey("pk");
-            Assert.Equal("pk", entityType.GetCosmosPartitionKeyPropertyName());
-            Assert.Equal(ConfigurationSource.Explicit,
-                ((IConventionEntityType)entityType).GetCosmosPartitionKeyPropertyNameConfigurationSource());
+            Assert.Equal("pk", entityType.GetPartitionKeyPropertyName());
+            Assert.Equal(
+                ConfigurationSource.Explicit,
+                ((IConventionEntityType)entityType).GetPartitionKeyPropertyNameConfigurationSource());
 
             Assert.False(((IConventionEntityType)entityType).Builder.CanSetPartitionKey("partition"));
 
             entityTypeBuilder.HasPartitionKey(null);
-            Assert.Null(entityType.GetCosmosPartitionKeyPropertyName());
-            Assert.Null(((IConventionEntityType)entityType).GetCosmosPartitionKeyPropertyNameConfigurationSource());
+            Assert.Null(entityType.GetPartitionKeyPropertyName());
+            Assert.Null(((IConventionEntityType)entityType).GetPartitionKeyPropertyNameConfigurationSource());
         }
 
         [ConditionalFact]
@@ -65,19 +67,19 @@ namespace Microsoft.EntityFrameworkCore.Metadata
             var entityType = modelBuilder.Model.FindEntityType(typeof(Customer));
             modelBuilder.HasDefaultContainer(null);
 
-            Assert.Equal(nameof(Customer), entityType.GetCosmosContainer());
-            Assert.Null(modelBuilder.Model.GetCosmosDefaultContainer());
+            Assert.Equal(nameof(Customer), entityType.GetContainer());
+            Assert.Null(modelBuilder.Model.GetDefaultContainer());
 
             modelBuilder.HasDefaultContainer("db0");
 
-            Assert.Equal("db0", entityType.GetCosmosContainer());
-            Assert.Equal("db0", modelBuilder.Model.GetCosmosDefaultContainer());
+            Assert.Equal("db0", entityType.GetContainer());
+            Assert.Equal("db0", modelBuilder.Model.GetDefaultContainer());
 
             modelBuilder
                 .Entity<Customer>()
                 .ToContainer("db1");
 
-            Assert.Equal("db1", entityType.GetCosmosContainer());
+            Assert.Equal("db1", entityType.GetContainer());
         }
 
         [ConditionalFact]
@@ -107,6 +109,33 @@ namespace Microsoft.EntityFrameworkCore.Metadata
             Assert.Null(entityType.GetDiscriminatorProperty());
         }
 
+        [ConditionalFact]
+        public void Can_set_etag_concurrency_entity()
+        {
+            var modelBuilder = CreateConventionModelBuilder();
+            modelBuilder.Entity<Customer>().UseETagConcurrency();
+            var model = modelBuilder.Model;
+
+            var etagProperty = model.FindEntityType(typeof(Customer).FullName).FindProperty("_etag");
+            Assert.NotNull(etagProperty);
+            Assert.Equal(ValueGenerated.OnAddOrUpdate, etagProperty.ValueGenerated);
+            Assert.True(etagProperty.IsConcurrencyToken);
+        }
+
+        [ConditionalFact]
+        public void Can_set_etag_concurrency_property()
+        {
+            var modelBuilder = CreateConventionModelBuilder();
+            modelBuilder.Entity<Customer>().Property(x => x.ETag).IsETagConcurrency();
+            var model = modelBuilder.Model;
+
+            var etagProperty = model.FindEntityType(typeof(Customer).FullName).FindProperty("ETag");
+            Assert.NotNull(etagProperty);
+            Assert.Equal(ValueGenerated.OnAddOrUpdate, etagProperty.ValueGenerated);
+            Assert.True(etagProperty.IsConcurrencyToken);
+            Assert.Equal("_etag", etagProperty.GetJsonPropertyName());
+        }
+
         protected virtual ModelBuilder CreateConventionModelBuilder() => CosmosTestHelpers.Instance.CreateConventionBuilder();
 
         private class Customer
@@ -114,6 +143,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata
             public int Id { get; set; }
             public string Name { get; set; }
             public short SomeShort { get; set; }
+            public string ETag { get; set; }
         }
     }
 }

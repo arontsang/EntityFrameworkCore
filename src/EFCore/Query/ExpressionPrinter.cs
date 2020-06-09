@@ -7,18 +7,36 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
+    /// <summary>
+    ///     <para>
+    ///         A class to create a printable string representation of expression.
+    ///     </para>
+    ///     <para>
+    ///         This type is typically used by database providers (and other extensions). It is generally
+    ///         not used in application code.
+    ///     </para>
+    /// </summary>
     public class ExpressionPrinter : ExpressionVisitor
     {
+        private static readonly List<string> _simpleMethods = new List<string>
+        {
+            "get_Item",
+            "TryReadValue",
+            "ReferenceEquals"
+        };
+
         private readonly IndentedStringBuilder _stringBuilder;
         private readonly Dictionary<ParameterExpression, string> _parametersInScope;
         private readonly List<ParameterExpression> _namelessParameters;
+        private readonly List<ParameterExpression> _encounteredParameters;
 
         private readonly Dictionary<ExpressionType, string> _binaryOperandMap = new Dictionary<ExpressionType, string>
         {
@@ -42,108 +60,133 @@ namespace Microsoft.EntityFrameworkCore.Query
             { ExpressionType.ExclusiveOr, " ^ " }
         };
 
+        /// <summary>
+        ///     Creates a new instance of the <see cref="ExpressionPrinter" /> class.
+        /// </summary>
         public ExpressionPrinter()
         {
             _stringBuilder = new IndentedStringBuilder();
             _parametersInScope = new Dictionary<ParameterExpression, string>();
             _namelessParameters = new List<ParameterExpression>();
+            _encounteredParameters = new List<ParameterExpression>();
         }
 
-        public virtual IndentedStringBuilder StringBuilder => _stringBuilder;
-
-        private bool RemoveFormatting { get; set; }
-
         private int? CharacterLimit { get; set; }
+        private bool Verbose { get; set; }
 
-        private bool PrintConnections { get; set; }
-
-        public virtual void VisitList<T>(
-            IReadOnlyList<T> items,
-            Action<ExpressionPrinter> joinAction = null)
+        /// <summary>
+        ///     Visit given readonly collection of expression for printing.
+        /// </summary>
+        /// <param name="items"> A collection of items to print. </param>
+        /// <param name="joinAction"> A join action to use when joining printout of individual item in the collection. </param>
+        public virtual void VisitCollection<T>([NotNull] IReadOnlyCollection<T> items,
+            [CanBeNull] Action<ExpressionPrinter> joinAction = null)
             where T : Expression
         {
-            joinAction ??= (p => p.StringBuilder.Append(", "));
+            Check.NotNull(items, nameof(items));
 
-            for (var i = 0; i < items.Count; i++)
+            joinAction ??= (p => p.Append(", "));
+
+            var first = true;
+            foreach (var item in items)
             {
-                if (i > 0)
+                if (!first)
                 {
                     joinAction(this);
                 }
+                else
+                {
+                    first = false;
+                }
 
-                Visit(items[i]);
+                Visit(item);
             }
         }
 
-        public virtual ExpressionPrinter Append([NotNull] object o)
-        {
-            _stringBuilder.Append(o);
-            return this;
-        }
-
+        /// <summary>
+        ///     Appends a new line to current output being built.
+        /// </summary>
+        /// <returns> This printer so additional calls can be chained. </returns>
         public virtual ExpressionPrinter AppendLine()
         {
             _stringBuilder.AppendLine();
             return this;
         }
 
-        public virtual ExpressionVisitor AppendLine([NotNull] object o)
+        /// <summary>
+        ///     Appends the given string and a new line to current output being built.
+        /// </summary>
+        /// <param name="value"> The string to append. </param>
+        /// <returns> This printer so additional calls can be chained. </returns>
+        public virtual ExpressionVisitor AppendLine([NotNull] string value)
         {
-            _stringBuilder.AppendLine(o);
+            _stringBuilder.AppendLine(value);
             return this;
         }
 
-        public virtual ExpressionPrinter AppendLines([NotNull] object o, bool skipFinalNewline = false)
+        /// <summary>
+        ///     Appends all the lines to current output being built.
+        /// </summary>
+        /// <param name="value"> The string to append. </param>
+        /// <param name="skipFinalNewline"> If true, then a terminating new line is not added. </param>
+        /// <returns> This printer so additional calls can be chained. </returns>
+        public virtual ExpressionPrinter AppendLines([NotNull] string value, bool skipFinalNewline = false)
         {
-            _stringBuilder.AppendLines(o, skipFinalNewline);
+            _stringBuilder.AppendLines(value, skipFinalNewline);
             return this;
         }
 
-        public virtual ExpressionPrinter IncrementIndent()
-        {
-            _stringBuilder.IncrementIndent();
-            return this;
-        }
-
-        public virtual ExpressionPrinter IncrementIndent(bool connectNode)
-        {
-            _stringBuilder.IncrementIndent(connectNode);
-            return this;
-        }
-
-        public virtual ExpressionPrinter DecrementIndent()
-        {
-            _stringBuilder.DecrementIndent();
-            return this;
-        }
-
+        /// <summary>
+        ///     Creates a scoped indenter that will increment the indent, then decrement it when disposed.
+        /// </summary>
+        /// <returns> An indenter. </returns>
         public virtual IDisposable Indent() => _stringBuilder.Indent();
 
-        private void Append([NotNull] string message) => _stringBuilder.Append(message);
-
-        private void AppendLine([NotNull] string message = "")
+        /// <summary>
+        ///     Appends the given string to current output being built.
+        /// </summary>
+        /// <param name="value"> The string to append. </param>
+        /// <returns> This printer so additional calls can be chained. </returns>
+        public virtual ExpressionPrinter Append([NotNull] string value)
         {
-            if (RemoveFormatting)
-            {
-                _stringBuilder.Append(string.IsNullOrEmpty(message) ? " " : message);
-            }
-
-            _stringBuilder.AppendLine(message);
+            _stringBuilder.Append(value);
+            return this;
         }
 
+        /// <summary>
+        ///     Creates a printable string representation of the given expression.
+        /// </summary>
+        /// <param name="expression"> The expression to print. </param>
+        /// <param name="characterLimit"> An optional limit to the number of characters included. Additional output will be truncated. </param>
+        /// <returns> The printable representation. </returns>
         public virtual string Print(
-            Expression expression,
-            bool removeFormatting = false,
-            int? characterLimit = null,
-            bool printConnections = true)
+            [NotNull] Expression expression,
+            int? characterLimit = null)
+            => PrintCore(expression, characterLimit, verbose: false);
+
+        /// <summary>
+        ///     Creates a printable verbose string representation of the given expression.
+        /// </summary>
+        /// <param name="expression"> The expression to print. </param>
+        /// <returns> The printable representation. </returns>
+        public virtual string PrintDebug(
+            [NotNull] Expression expression)
+            => PrintCore(expression, characterLimit: null, verbose: true);
+
+        private string PrintCore(
+            [NotNull] Expression expression,
+            int? characterLimit,
+            bool verbose)
         {
+            Check.NotNull(expression, nameof(expression));
+
             _stringBuilder.Clear();
             _parametersInScope.Clear();
             _namelessParameters.Clear();
+            _encounteredParameters.Clear();
 
-            RemoveFormatting = removeFormatting;
             CharacterLimit = characterLimit;
-            PrintConnections = printConnections;
+            Verbose = verbose;
 
             Visit(expression);
 
@@ -160,11 +203,17 @@ namespace Microsoft.EntityFrameworkCore.Query
             return queryPlan;
         }
 
+        /// <summary>
+        ///     Returns binary operator string corresponding to given <see cref="ExpressionType"/>.
+        /// </summary>
+        /// <param name="expressionType"> The expression type to generate binary operator for. </param>
+        /// <returns> The binary operator string. </returns>
         public virtual string GenerateBinaryOperator(ExpressionType expressionType)
         {
             return _binaryOperandMap[expressionType];
         }
 
+        /// <inheritdoc />
         public override Expression Visit(Expression expression)
         {
             if (expression == null)
@@ -274,6 +323,10 @@ namespace Microsoft.EntityFrameworkCore.Query
                     VisitTypeBinary((TypeBinaryExpression)expression);
                     break;
 
+                case ExpressionType.Switch:
+                    VisitSwitch((SwitchExpression)expression);
+                    break;
+
                 case ExpressionType.Extension:
                     VisitExtension(expression);
                     break;
@@ -286,8 +339,11 @@ namespace Microsoft.EntityFrameworkCore.Query
             return expression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitBinary(BinaryExpression binaryExpression)
         {
+            Check.NotNull(binaryExpression, nameof(binaryExpression));
+
             Visit(binaryExpression.Left);
 
             if (binaryExpression.NodeType == ExpressionType.ArrayIndex)
@@ -315,60 +371,56 @@ namespace Microsoft.EntityFrameworkCore.Query
             return binaryExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitBlock(BlockExpression blockExpression)
         {
+            Check.NotNull(blockExpression, nameof(blockExpression));
+
             AppendLine();
-
-            if (PrintConnections)
-            {
-                _stringBuilder.SuspendCurrentNode();
-            }
-
             AppendLine("{");
-            _stringBuilder.IncrementIndent();
 
-            foreach (var variable in blockExpression.Variables)
+            using (_stringBuilder.Indent())
             {
-                if (!_parametersInScope.ContainsKey(variable))
+                foreach (var variable in blockExpression.Variables)
                 {
-                    _parametersInScope.Add(variable, variable.Name);
-                    Append(variable.Type.ShortDisplayName());
-                    Append(" ");
-                    VisitParameter(variable);
+                    if (!_parametersInScope.ContainsKey(variable))
+                    {
+                        _parametersInScope.Add(variable, variable.Name);
+                        Append(variable.Type.ShortDisplayName());
+                        Append(" ");
+                        VisitParameter(variable);
+                        AppendLine(";");
+                    }
+                }
+
+                var expressions = blockExpression.Result != null
+                    ? blockExpression.Expressions.Except(new[] { blockExpression.Result })
+                    : blockExpression.Expressions;
+
+                foreach (var expression in expressions)
+                {
+                    Visit(expression);
+                    AppendLine(";");
+                }
+
+                if (blockExpression.Result != null)
+                {
+                    Append("return ");
+                    Visit(blockExpression.Result);
                     AppendLine(";");
                 }
             }
 
-            var expressions = blockExpression.Result != null
-                ? blockExpression.Expressions.Except(new[] { blockExpression.Result })
-                : blockExpression.Expressions;
-
-            foreach (var expression in expressions)
-            {
-                Visit(expression);
-                AppendLine(";");
-            }
-
-            if (blockExpression.Result != null)
-            {
-                Append("return ");
-                Visit(blockExpression.Result);
-                AppendLine(";");
-            }
-
-            _stringBuilder.DecrementIndent();
             Append("}");
-
-            if (PrintConnections)
-            {
-                _stringBuilder.ReconnectCurrentNode();
-            }
 
             return blockExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitConditional(ConditionalExpression conditionalExpression)
         {
+            Check.NotNull(conditionalExpression, nameof(conditionalExpression));
+
             Visit(conditionalExpression.Test);
 
             _stringBuilder.Append(" ? ");
@@ -382,29 +434,18 @@ namespace Microsoft.EntityFrameworkCore.Query
             return conditionalExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitConstant(ConstantExpression constantExpression)
         {
-            if (PrintConnections)
-            {
-                _stringBuilder.SuspendCurrentNode();
-            }
+            Check.NotNull(constantExpression, nameof(constantExpression));
 
-            if (constantExpression.Value is IPrintable printable)
+            if (constantExpression.Value is IPrintableExpression printable)
             {
                 printable.Print(this);
-            }
-            else if (constantExpression.IsEntityQueryable())
-            {
-                _stringBuilder.Append($"DbSet<{constantExpression.Type.GetTypeInfo().GenericTypeArguments.First().ShortDisplayName()}>");
             }
             else
             {
                 Print(constantExpression.Value);
-            }
-
-            if (PrintConnections)
-            {
-                _stringBuilder.ReconnectCurrentNode();
             }
 
             return constantExpression;
@@ -441,48 +482,65 @@ namespace Microsoft.EntityFrameworkCore.Query
             _stringBuilder.Append(stringValue);
         }
 
+        /// <inheritdoc />
         protected override Expression VisitGoto(GotoExpression gotoExpression)
         {
+            Check.NotNull(gotoExpression, nameof(gotoExpression));
+
             AppendLine("return (" + gotoExpression.Target.Type.ShortDisplayName() + ")" + gotoExpression.Target + " {");
-            _stringBuilder.IncrementIndent();
+            using (_stringBuilder.Indent())
+            {
+                Visit(gotoExpression.Value);
+            }
 
-            Visit(gotoExpression.Value);
-
-            _stringBuilder.DecrementIndent();
             _stringBuilder.Append("}");
 
             return gotoExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitLabel(LabelExpression labelExpression)
         {
+            Check.NotNull(labelExpression, nameof(labelExpression));
+
             _stringBuilder.Append(labelExpression.Target.ToString());
 
             return labelExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitLambda<T>(Expression<T> lambdaExpression)
         {
-            _stringBuilder.Append("(");
+            Check.NotNull(lambdaExpression, nameof(lambdaExpression));
+
+            if (lambdaExpression.Parameters.Count != 1)
+            {
+                _stringBuilder.Append("(");
+            }
 
             foreach (var parameter in lambdaExpression.Parameters)
             {
-                var parameterName = parameter.Name ?? parameter.ToString();
+                var parameterName = parameter.Name;
 
                 if (!_parametersInScope.ContainsKey(parameter))
                 {
                     _parametersInScope.Add(parameter, parameterName);
                 }
 
-                _stringBuilder.Append(parameter.Type.ShortDisplayName() + " " + parameterName);
+                Visit(parameter);
 
                 if (parameter != lambdaExpression.Parameters.Last())
                 {
-                    _stringBuilder.Append(" | ");
+                    _stringBuilder.Append(", ");
                 }
             }
 
-            _stringBuilder.Append(") => ");
+            if (lambdaExpression.Parameters.Count != 1)
+            {
+                _stringBuilder.Append(")");
+            }
+
+            _stringBuilder.Append(" => ");
 
             Visit(lambdaExpression.Body);
 
@@ -495,11 +553,15 @@ namespace Microsoft.EntityFrameworkCore.Query
             return lambdaExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitMember(MemberExpression memberExpression)
         {
+            Check.NotNull(memberExpression, nameof(memberExpression));
+
             if (memberExpression.Expression != null)
             {
-                if (memberExpression.Expression.NodeType == ExpressionType.Convert)
+                if (memberExpression.Expression.NodeType == ExpressionType.Convert
+                    || memberExpression.Expression is BinaryExpression)
                 {
                     _stringBuilder.Append("(");
                     Visit(memberExpression.Expression);
@@ -521,57 +583,41 @@ namespace Microsoft.EntityFrameworkCore.Query
             return memberExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitMemberInit(MemberInitExpression memberInitExpression)
         {
+            Check.NotNull(memberInitExpression, nameof(memberInitExpression));
+
             _stringBuilder.Append("new " + memberInitExpression.Type.ShortDisplayName());
 
-            var appendAction = memberInitExpression.Bindings.Count > 1 ? (Action<string>)AppendLine : Append;
+            var appendAction = memberInitExpression.Bindings.Count > 1 ? (Func<string, ExpressionVisitor>)AppendLine : Append;
             appendAction("{ ");
-            _stringBuilder.IncrementIndent();
-
-            for (var i = 0; i < memberInitExpression.Bindings.Count; i++)
+            using (_stringBuilder.Indent())
             {
-                if (memberInitExpression.Bindings[i] is MemberAssignment assignment)
+                for (var i = 0; i < memberInitExpression.Bindings.Count; i++)
                 {
-                    _stringBuilder.Append(assignment.Member.Name + " = ");
-                    Visit(assignment.Expression);
-                    appendAction(i == memberInitExpression.Bindings.Count - 1 ? " " : ", ");
-                }
-                else
-                {
-                    ////throw new NotSupportedException(CoreStrings.InvalidMemberInitBinding);
-                    AppendLine(CoreStrings.InvalidMemberInitBinding);
+                    if (memberInitExpression.Bindings[i] is MemberAssignment assignment)
+                    {
+                        _stringBuilder.Append(assignment.Member.Name + " = ");
+                        Visit(assignment.Expression);
+                        appendAction(i == memberInitExpression.Bindings.Count - 1 ? " " : ", ");
+                    }
+                    else
+                    {
+                        AppendLine(CoreStrings.InvalidMemberInitBinding);
+                    }
                 }
             }
 
-            _stringBuilder.DecrementIndent();
             AppendLine("}");
 
             return memberInitExpression;
         }
 
-        private static readonly List<string> _simpleMethods = new List<string>
-        {
-            "get_Item",
-            "TryReadValue",
-            "ReferenceEquals"
-        };
-
-        private static readonly List<string> _nonConnectableMethods = new List<string>
-        {
-            "GetValueFromEntity",
-            "StartTracking",
-            "SetRelationshipSnapshotValue",
-            "SetRelationshipIsLoaded",
-            "Add"
-        };
-
+        /// <inheritdoc />
         protected override Expression VisitMethodCall(MethodCallExpression methodCallExpression)
         {
-            if (!methodCallExpression.IsEFProperty())
-            {
-                _stringBuilder.Append(methodCallExpression.Method.ReturnType.ShortDisplayName() + " ");
-            }
+            Check.NotNull(methodCallExpression, nameof(methodCallExpression));
 
             if (methodCallExpression.Object != null)
             {
@@ -589,47 +635,75 @@ namespace Microsoft.EntityFrameworkCore.Query
                 _stringBuilder.Append(".");
             }
 
-            _stringBuilder.Append(methodCallExpression.Method.Name + "(");
+            var methodArguments = methodCallExpression.Arguments.ToList();
+            var method = methodCallExpression.Method;
 
-            var isSimpleMethodOrProperty = _simpleMethods.Contains(methodCallExpression.Method.Name)
-                                           || methodCallExpression.Arguments.Count < 2
-                                           || methodCallExpression.IsEFProperty();
+            var extensionMethod = !Verbose
+                && methodCallExpression.Arguments.Count > 0
+                && method.IsDefined(typeof(ExtensionAttribute), inherit: false);
 
-            var appendAction = isSimpleMethodOrProperty ? (Action<string>)Append : AppendLine;
+            if (extensionMethod)
+            {
+                Visit(methodArguments[0]);
+                _stringBuilder.IncrementIndent();
+                _stringBuilder.AppendLine();
+                _stringBuilder.Append($".{method.Name}");
+                methodArguments = methodArguments.Skip(1).ToList();
+                if (method.Name == nameof(Enumerable.Cast)
+                    || method.Name == nameof(Enumerable.OfType))
+                {
+                    PrintGenericArguments(method, _stringBuilder);
+                }
+            }
+            else
+            {
+                if (method.IsStatic)
+                {
+                    _stringBuilder.Append(method.DeclaringType.ShortDisplayName()).Append(".");
+                }
 
-            if (methodCallExpression.Arguments.Count > 0)
+                _stringBuilder.Append(method.Name);
+                PrintGenericArguments(method, _stringBuilder);
+            }
+
+            _stringBuilder.Append("(");
+
+            var isSimpleMethodOrProperty = _simpleMethods.Contains(method.Name)
+                || methodArguments.Count < 2
+                || method.IsEFPropertyMethod();
+
+            var appendAction = isSimpleMethodOrProperty ? (Func<string, ExpressionVisitor>)Append : AppendLine;
+
+            if (methodArguments.Count > 0)
             {
                 appendAction("");
 
                 var argumentNames
                     = !isSimpleMethodOrProperty
-                        ? methodCallExpression.Method.GetParameters().Select(p => p.Name).ToList()
+                        ? extensionMethod
+                            ? method.GetParameters().Skip(1).Select(p => p.Name).ToList()
+                            : method.GetParameters().Select(p => p.Name).ToList()
                         : new List<string>();
+
+                IDisposable indent = null;
 
                 if (!isSimpleMethodOrProperty)
                 {
-                    var shouldPrintConnections = PrintConnections && !_nonConnectableMethods.Contains(methodCallExpression.Method.Name);
-                    _stringBuilder.IncrementIndent(shouldPrintConnections);
+                    indent = _stringBuilder.Indent();
                 }
 
-                for (var i = 0; i < methodCallExpression.Arguments.Count; i++)
+                for (var i = 0; i < methodArguments.Count; i++)
                 {
-                    var argument = methodCallExpression.Arguments[i];
+                    var argument = methodArguments[i];
 
                     if (!isSimpleMethodOrProperty)
                     {
                         _stringBuilder.Append(argumentNames[i] + ": ");
                     }
 
-                    if (i == methodCallExpression.Arguments.Count - 1
-                        && !isSimpleMethodOrProperty)
-                    {
-                        _stringBuilder.DisconnectCurrentNode();
-                    }
-
                     Visit(argument);
 
-                    if (i < methodCallExpression.Arguments.Count - 1)
+                    if (i < methodArguments.Count - 1)
                     {
                         appendAction(", ");
                     }
@@ -637,21 +711,50 @@ namespace Microsoft.EntityFrameworkCore.Query
 
                 if (!isSimpleMethodOrProperty)
                 {
-                    _stringBuilder.DecrementIndent();
+                    indent?.Dispose();
                 }
             }
 
             Append(")");
 
+            if (extensionMethod)
+            {
+                _stringBuilder.DecrementIndent();
+            }
+
             return methodCallExpression;
+
+            static void PrintGenericArguments(MethodInfo method, IndentedStringBuilder stringBuilder)
+            {
+                if (method.IsGenericMethod)
+                {
+                    stringBuilder.Append("<");
+                    var first = true;
+                    foreach (var genericArgument in method.GetGenericArguments())
+                    {
+                        if (!first)
+                        {
+                            stringBuilder.Append(", ");
+                        }
+
+                        stringBuilder.Append(genericArgument.ShortDisplayName());
+                        first = false;
+                    }
+
+                    stringBuilder.Append(">");
+                }
+            }
         }
 
+        /// <inheritdoc />
         protected override Expression VisitNew(NewExpression newExpression)
         {
+            Check.NotNull(newExpression, nameof(newExpression));
+
             _stringBuilder.Append("new ");
 
             var isComplex = newExpression.Arguments.Count > 1;
-            var appendAction = isComplex ? (Action<string>)AppendLine : Append;
+            var appendAction = isComplex ? (Func<string, ExpressionVisitor>)AppendLine : Append;
 
             var isAnonymousType = newExpression.Type.IsAnonymousType();
             if (!isAnonymousType)
@@ -664,9 +767,10 @@ namespace Microsoft.EntityFrameworkCore.Query
                 appendAction("{ ");
             }
 
+            IDisposable indent = null;
             if (isComplex)
             {
-                _stringBuilder.IncrementIndent();
+                indent = _stringBuilder.Indent();
             }
 
             for (var i = 0; i < newExpression.Arguments.Count; i++)
@@ -682,7 +786,7 @@ namespace Microsoft.EntityFrameworkCore.Query
 
             if (isComplex)
             {
-                _stringBuilder.DecrementIndent();
+                indent?.Dispose();
             }
 
             if (!isAnonymousType)
@@ -697,44 +801,40 @@ namespace Microsoft.EntityFrameworkCore.Query
             return newExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitNewArray(NewArrayExpression newArrayExpression)
         {
+            Check.NotNull(newArrayExpression, nameof(newArrayExpression));
+
             var isComplex = newArrayExpression.Expressions.Count > 1;
-            var appendAction = isComplex ? (Action<string>)AppendLine : Append;
+            var appendAction = isComplex ? (Func<string, ExpressionVisitor>)AppendLine : Append;
 
             appendAction("new " + newArrayExpression.Type.GetElementType().ShortDisplayName() + "[]");
-
-            if (PrintConnections)
-            {
-                _stringBuilder.SuspendCurrentNode();
-            }
-
             appendAction("{ ");
 
+            IDisposable indent = null;
             if (isComplex)
             {
-                _stringBuilder.IncrementIndent();
+                indent = _stringBuilder.Indent();
             }
 
             VisitArguments(newArrayExpression.Expressions, appendAction, lastSeparator: " ");
 
             if (isComplex)
             {
-                _stringBuilder.DecrementIndent();
+                indent?.Dispose();
             }
 
             Append("}");
 
-            if (PrintConnections)
-            {
-                _stringBuilder.ReconnectCurrentNode();
-            }
-
             return newArrayExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitParameter(ParameterExpression parameterExpression)
         {
+            Check.NotNull(parameterExpression, nameof(parameterExpression));
+
             if (_parametersInScope.ContainsKey(parameterExpression))
             {
                 var parameterName = _parametersInScope[parameterExpression];
@@ -746,7 +846,7 @@ namespace Microsoft.EntityFrameworkCore.Query
                     }
 
                     Append("namelessParameter{");
-                    Append(_namelessParameters.IndexOf(parameterExpression));
+                    Append(_namelessParameters.IndexOf(parameterExpression).ToString());
                     Append("}");
                 }
                 else if (parameterName.Contains("."))
@@ -762,16 +862,41 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
             else
             {
-                Append("(Unhandled parameter: ");
-                Append(parameterExpression.Name);
-                Append(")");
+                if (Verbose)
+                {
+                    Append("(Unhandled parameter: ");
+                    Append(parameterExpression.Name);
+                    Append(")");
+                }
+                else
+                {
+                    Append(parameterExpression.Name);
+                }
+            }
+
+            if (Verbose)
+            {
+                var parameterIndex = _encounteredParameters.Count;
+                if (_encounteredParameters.Contains(parameterExpression))
+                {
+                    parameterIndex = _encounteredParameters.IndexOf(parameterExpression);
+                }
+                else
+                {
+                    _encounteredParameters.Add(parameterExpression);
+                }
+
+                _stringBuilder.Append("{" + parameterIndex + "}");
             }
 
             return parameterExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitUnary(UnaryExpression unaryExpression)
         {
+            Check.NotNull(unaryExpression, nameof(unaryExpression));
+
             // ReSharper disable once SwitchStatementMissingSomeCases
             switch (unaryExpression.NodeType)
             {
@@ -820,15 +945,21 @@ namespace Microsoft.EntityFrameworkCore.Query
             return unaryExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitDefault(DefaultExpression defaultExpression)
         {
+            Check.NotNull(defaultExpression, nameof(defaultExpression));
+
             _stringBuilder.Append("default(" + defaultExpression.Type.ShortDisplayName() + ")");
 
             return defaultExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitTry(TryExpression tryExpression)
         {
+            Check.NotNull(tryExpression, nameof(tryExpression));
+
             _stringBuilder.Append("try { ");
             Visit(tryExpression.Body);
             _stringBuilder.Append(" } ");
@@ -841,18 +972,28 @@ namespace Microsoft.EntityFrameworkCore.Query
             return tryExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitIndex(IndexExpression indexExpression)
         {
+            Check.NotNull(indexExpression, nameof(indexExpression));
+
             Visit(indexExpression.Object);
             _stringBuilder.Append("[");
-            VisitArguments(indexExpression.Arguments, s => _stringBuilder.Append(s));
+            VisitArguments(indexExpression.Arguments, s =>
+            {
+                _stringBuilder.Append(s);
+                return null;
+            });
             _stringBuilder.Append("]");
 
             return indexExpression;
         }
 
+        /// <inheritdoc />
         protected override Expression VisitTypeBinary(TypeBinaryExpression typeBinaryExpression)
         {
+            Check.NotNull(typeBinaryExpression, nameof(typeBinaryExpression));
+
             _stringBuilder.Append("(");
             Visit(typeBinaryExpression.Expression);
             _stringBuilder.Append(" is " + typeBinaryExpression.TypeOperand.ShortDisplayName() + ")");
@@ -860,9 +1001,55 @@ namespace Microsoft.EntityFrameworkCore.Query
             return typeBinaryExpression;
         }
 
+        /// <inheritdoc />
+        protected override Expression VisitSwitch(SwitchExpression switchExpression)
+        {
+            _stringBuilder.Append("switch (");
+            Visit(switchExpression.SwitchValue);
+            _stringBuilder.AppendLine(")");
+            _stringBuilder.AppendLine("{");
+            _stringBuilder.IncrementIndent();
+
+            foreach (var @case in switchExpression.Cases)
+            {
+                foreach (var testValue in @case.TestValues)
+                {
+                    _stringBuilder.Append("case ");
+                    Visit(testValue);
+                    _stringBuilder.AppendLine(": ");
+                }
+
+                using (var indent = _stringBuilder.Indent())
+                {
+                    Visit(@case.Body);
+                }
+
+                _stringBuilder.AppendLine();
+            }
+
+            if (switchExpression.DefaultBody != null)
+            {
+                _stringBuilder.AppendLine("default: ");
+                using (_stringBuilder.Indent())
+                {
+                    Visit(switchExpression.DefaultBody);
+                }
+
+                _stringBuilder.AppendLine();
+            }
+
+            _stringBuilder.DecrementIndent();
+            _stringBuilder.AppendLine("}");
+
+            return switchExpression;
+        }
+
+        /// <inheritdoc />
         protected override Expression VisitExtension(Expression extensionExpression)
         {
-            if (extensionExpression is IPrintable printable)
+            Check.NotNull(extensionExpression, nameof(extensionExpression));
+
+            if (extensionExpression is IPrintableExpression printable)
             {
                 printable.Print(this);
             }
@@ -874,14 +1061,17 @@ namespace Microsoft.EntityFrameworkCore.Query
             return extensionExpression;
         }
 
-        private void VisitArguments(IReadOnlyList<Expression> arguments, Action<string> appendAction, string lastSeparator = "", bool areConnected = false)
+        private void VisitArguments(
+            IReadOnlyList<Expression> arguments,
+            Func<string, ExpressionVisitor> appendAction,
+            string lastSeparator = "",
+            bool areConnected = false)
         {
             for (var i = 0; i < arguments.Count; i++)
             {
                 if (areConnected && i == arguments.Count - 1)
                 {
                     Append("");
-                    _stringBuilder.DisconnectCurrentNode();
                 }
 
                 Visit(arguments[i]);
@@ -889,14 +1079,14 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
         }
 
-        protected virtual string PostProcess([NotNull] string queryPlan)
+        private string PostProcess([NotNull] string printedExpression)
         {
-            var processedPlan = queryPlan
+            var processedPrintedExpression = printedExpression
                 .Replace("Microsoft.EntityFrameworkCore.Query.", "")
                 .Replace("Microsoft.EntityFrameworkCore.", "")
                 .Replace(Environment.NewLine + Environment.NewLine, Environment.NewLine);
 
-            return processedPlan;
+            return processedPrintedExpression;
         }
 
         private void UnhandledExpressionType(Expression expression)

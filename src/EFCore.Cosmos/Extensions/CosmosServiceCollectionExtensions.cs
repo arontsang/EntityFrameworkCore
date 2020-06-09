@@ -9,12 +9,14 @@ using Microsoft.EntityFrameworkCore.Cosmos.Internal;
 using Microsoft.EntityFrameworkCore.Cosmos.Metadata.Conventions.Internal;
 using Microsoft.EntityFrameworkCore.Cosmos.Query.Internal;
 using Microsoft.EntityFrameworkCore.Cosmos.Storage.Internal;
+using Microsoft.EntityFrameworkCore.Cosmos.ValueGeneration.Internal;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
+using Microsoft.EntityFrameworkCore.ValueGeneration;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection
@@ -33,7 +35,7 @@ namespace Microsoft.Extensions.DependencyInjection
         ///         Calling this method is no longer necessary when building most applications, including those that
         ///         use dependency injection in ASP.NET or elsewhere.
         ///         It is only needed when building the internal service provider for use with
-        ///         the <see cref="DbContextOptionsBuilder.UseInternalServiceProvider"/> method.
+        ///         the <see cref="DbContextOptionsBuilder.UseInternalServiceProvider" /> method.
         ///         This is not recommend other than for some advanced scenarios.
         ///     </para>
         /// </summary>
@@ -53,6 +55,7 @@ namespace Microsoft.Extensions.DependencyInjection
                 .TryAdd<IDbContextTransactionManager, CosmosTransactionManager>()
                 .TryAdd<IModelValidator, CosmosModelValidator>()
                 .TryAdd<IProviderConventionSetBuilder, CosmosConventionSetBuilder>()
+                .TryAdd<IValueGeneratorSelector, CosmosValueGeneratorSelector>()
                 .TryAdd<IDatabaseCreator, CosmosDatabaseCreator>()
                 .TryAdd<IQueryContextFactory, CosmosQueryContextFactory>()
                 .TryAdd<ITypeMappingSource, CosmosTypeMappingSource>()
@@ -60,8 +63,9 @@ namespace Microsoft.Extensions.DependencyInjection
                 // New Query pipeline
                 .TryAdd<IQueryableMethodTranslatingExpressionVisitorFactory, CosmosQueryableMethodTranslatingExpressionVisitorFactory>()
                 .TryAdd<IShapedQueryCompilingExpressionVisitorFactory, CosmosShapedQueryCompilingExpressionVisitorFactory>()
-
                 .TryAdd<ISingletonOptions, ICosmosSingletonOptions>(p => p.GetService<ICosmosSingletonOptions>())
+                .TryAdd<IQueryTranslationPreprocessorFactory, CosmosQueryTranslationPreprocessorFactory>()
+                .TryAdd<IQueryCompilationContextFactory, CosmosQueryCompilationContextFactory>()
                 .TryAddProviderSpecificServices(
                     b => b
                         .TryAddSingleton<ICosmosSingletonOptions, CosmosSingletonOptions>()

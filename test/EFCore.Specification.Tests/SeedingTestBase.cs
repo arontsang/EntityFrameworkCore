@@ -16,21 +16,19 @@ namespace Microsoft.EntityFrameworkCore
         [InlineData(true)]
         public virtual async Task Seeding_does_not_leave_context_contaminated(bool async)
         {
-            using (var context = CreateContextWithEmptyDatabase(async ? "1A" : "1S"))
-            {
-                var _ = async
-                    ? await context.Database.EnsureCreatedResilientlyAsync()
-                    : context.Database.EnsureCreatedResiliently();
+            using var context = CreateContextWithEmptyDatabase(async ? "1A" : "1S");
+            var _ = async
+                ? await context.Database.EnsureCreatedResilientlyAsync()
+                : context.Database.EnsureCreatedResiliently();
 
-                Assert.Empty(context.ChangeTracker.Entries());
+            Assert.Empty(context.ChangeTracker.Entries());
 
-                var seeds = context.Set<Seed>().OrderBy(e => e.Id).ToList();
-                Assert.Equal(2, seeds.Count);
-                Assert.Equal(321, seeds[0].Id);
-                Assert.Equal("Apple", seeds[0].Species);
-                Assert.Equal(322, seeds[1].Id);
-                Assert.Equal("Orange", seeds[1].Species);
-            }
+            var seeds = context.Set<Seed>().OrderBy(e => e.Id).ToList();
+            Assert.Equal(2, seeds.Count);
+            Assert.Equal(321, seeds[0].Id);
+            Assert.Equal("Apple", seeds[0].Species);
+            Assert.Equal(322, seeds[1].Id);
+            Assert.Equal("Orange", seeds[1].Species);
         }
 
         protected abstract SeedingContext CreateContextWithEmptyDatabase(string testId);
@@ -44,14 +42,8 @@ namespace Microsoft.EntityFrameworkCore
 
             protected override void OnModelCreating(ModelBuilder modelBuilder)
                 => modelBuilder.Entity<Seed>().HasData(
-                    new Seed
-                    {
-                        Id = 321, Species = "Apple"
-                    },
-                    new Seed
-                    {
-                        Id = 322, Species = "Orange"
-                    }
+                    new Seed { Id = 321, Species = "Apple" },
+                    new Seed { Id = 322, Species = "Orange" }
                 );
         }
 
@@ -59,6 +51,7 @@ namespace Microsoft.EntityFrameworkCore
         {
             [DatabaseGenerated(DatabaseGeneratedOption.None)]
             public int Id { get; set; }
+
             public string Species { get; set; }
         }
     }

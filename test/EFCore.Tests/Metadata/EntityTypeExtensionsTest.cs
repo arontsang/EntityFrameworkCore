@@ -22,8 +22,8 @@ namespace Microsoft.EntityFrameworkCore.Metadata
 
             var fk = entityType.AddForeignKey(new[] { fkProp }, pk, entityType);
             fk.IsUnique = true;
-            var dependentToPrincipal = fk.HasDependentToPrincipal(nameof(SelfRef.SelfRefPrincipal));
-            var principalToDependent = fk.HasPrincipalToDependent(nameof(SelfRef.SelfRefDependent));
+            var dependentToPrincipal = fk.SetDependentToPrincipal(nameof(SelfRef.SelfRefPrincipal));
+            var principalToDependent = fk.SetPrincipalToDependent(nameof(SelfRef.SelfRefDependent));
 
             Assert.Equal(
                 new IPropertyBase[] { pk.Properties.Single(), fkProp, principalToDependent, dependentToPrincipal },
@@ -51,9 +51,9 @@ namespace Microsoft.EntityFrameworkCore.Metadata
             b.BaseType = a;
             c.BaseType = b;
 
-            Assert.Same(a, a.RootType());
-            Assert.Same(a, b.RootType());
-            Assert.Same(a, c.RootType());
+            Assert.Same(a, a.GetRootType());
+            Assert.Same(a, b.GetRootType());
+            Assert.Same(a, c.GetRootType());
         }
 
         [ConditionalFact]

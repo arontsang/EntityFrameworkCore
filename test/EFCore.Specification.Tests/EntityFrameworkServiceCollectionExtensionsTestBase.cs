@@ -45,7 +45,7 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         protected virtual void LifetimeTest(
-            params IDictionary<Type, EntityFrameworkServicesBuilder.ServiceCharacteristics>[] serviceDefinitions)
+            params IDictionary<Type, ServiceCharacteristics>[] serviceDefinitions)
         {
             var services = AddServices(new ServiceCollection());
 
@@ -59,7 +59,7 @@ namespace Microsoft.EntityFrameworkCore
                 }
                 else
                 {
-                    Assert.Equal(1, registered.Count);
+                    Assert.Single(registered);
                     Assert.Equal(coreService.Value.Lifetime, registered[0].Lifetime);
                 }
             }

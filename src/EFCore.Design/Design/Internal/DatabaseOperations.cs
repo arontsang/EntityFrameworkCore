@@ -25,6 +25,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
         private readonly string _rootNamespace;
         private readonly string _language;
         private readonly DesignTimeServicesBuilder _servicesBuilder;
+        private readonly string[] _args;
 
         /// <summary>
         ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
@@ -45,14 +46,16 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             Check.NotNull(startupAssembly, nameof(startupAssembly));
             Check.NotNull(projectDir, nameof(projectDir));
             Check.NotNull(rootNamespace, nameof(rootNamespace));
-            Check.NotNull(args, nameof(args));
+            // Note: cannot assert that args is not null - as old versions of
+            // tools can still pass null.
 
             _reporter = reporter;
             _projectDir = projectDir;
             _rootNamespace = rootNamespace;
             _language = language;
+            _args = args ?? Array.Empty<string>();
 
-            _servicesBuilder = new DesignTimeServicesBuilder(assembly, startupAssembly, reporter, args);
+            _servicesBuilder = new DesignTimeServicesBuilder(assembly, startupAssembly, reporter, _args);
         }
 
         /// <summary>
@@ -69,9 +72,12 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             [CanBeNull] string dbContextClassName,
             [NotNull] IEnumerable<string> schemas,
             [NotNull] IEnumerable<string> tables,
+            [CanBeNull] string modelNamespace,
+            [CanBeNull] string contextNamespace,
             bool useDataAnnotations,
             bool overwriteFiles,
-            bool useDatabaseNames)
+            bool useDatabaseNames,
+            bool suppressOnConfiguring)
         {
             Check.NotEmpty(provider, nameof(provider));
             Check.NotEmpty(connectionString, nameof(connectionString));
@@ -90,25 +96,26 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
 
             var scaffolder = services.GetRequiredService<IReverseEngineerScaffolder>();
 
-            var modelNamespace = GetNamespaceFromOutputPath(outputDir);
-            var contextNamespace = GetNamespaceFromOutputPath(outputContextDir);
+            var finalModelNamespace = modelNamespace ?? GetNamespaceFromOutputPath(outputDir);
+            var finalContextNamespace =
+                contextNamespace ??
+                modelNamespace ??
+                GetNamespaceFromOutputPath(outputContextDir);
 
             var scaffoldedModel = scaffolder.ScaffoldModel(
                 connectionString,
                 new DatabaseModelFactoryOptions(tables, schemas),
-                new ModelReverseEngineerOptions
-                {
-                    UseDatabaseNames = useDatabaseNames
-                },
+                new ModelReverseEngineerOptions { UseDatabaseNames = useDatabaseNames },
                 new ModelCodeGenerationOptions
                 {
                     UseDataAnnotations = useDataAnnotations,
                     RootNamespace = _rootNamespace,
-                    ModelNamespace = modelNamespace,
-                    ContextNamespace = contextNamespace,
+                    ModelNamespace = finalModelNamespace,
+                    ContextNamespace = finalContextNamespace,
                     Language = _language,
                     ContextDir = MakeDirRelative(outputDir, outputContextDir),
                     ContextName = dbContextClassName,
+                    SuppressOnConfiguring = suppressOnConfiguring
                 });
 
             return scaffolder.Save(
@@ -138,7 +145,10 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
             var subPath = outputDir.Substring(projectDir.Length);
 
             return !string.IsNullOrWhiteSpace(subPath)
-                ? string.Join(".", subPath.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries))
+                ? string.Join(
+                    ".",
+                    subPath.Split(
+                        new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries))
                 : null;
         }
 
@@ -158,7 +168,7 @@ namespace Microsoft.EntityFrameworkCore.Design.Internal
 
             var last = path[path.Length - 1];
             return last == Path.DirectorySeparatorChar
-                || last == Path.AltDirectorySeparatorChar
+                   || last == Path.AltDirectorySeparatorChar
                 ? path
                 : path + Path.DirectorySeparatorChar;
         }

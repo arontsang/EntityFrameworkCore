@@ -6,66 +6,148 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Utilities;
 
 namespace Microsoft.EntityFrameworkCore.Query
 {
+    /// <summary>
+    ///     A query compilation context. The primary data structure representing the state/components
+    ///     used during query compilation.
+    /// </summary>
     public class QueryCompilationContext
     {
-        public static readonly ParameterExpression QueryContextParameter = Expression.Parameter(typeof(QueryContext), "queryContext");
-
-        private readonly IQueryOptimizerFactory _queryOptimizerFactory;
-        private readonly IQueryableMethodTranslatingExpressionVisitorFactory _queryableMethodTranslatingExpressionVisitorFactory;
-        private readonly IShapedQueryOptimizerFactory _shapedQueryOptimizerFactory;
-        private readonly IShapedQueryCompilingExpressionVisitorFactory _shapedQueryCompilingExpressionVisitorFactory;
+        /// <summary>
+        ///     <para>
+        ///         Prefix for all the query parameters generated during parameter extraction in query pipeline.
+        ///     </para>
+        ///     <para>
+        ///         This property is typically used by database providers (and other extensions). It is generally
+        ///         not used in application code.
+        ///     </para>
+        /// </summary>
+        public const string QueryParameterPrefix = "__";
 
         /// <summary>
-        ///     A dictionary mapping parameter names to lambdas that, given a QueryContext, can extract that parameter's value.
-        ///     This is needed for cases where we need to introduce a parameter during the compilation phase (e.g. entity equality rewrites
-        ///     a parameter to an ID property on that parameter).
+        ///     <para>
+        ///         ParameterExpression representing <see cref="QueryContext"/> parameter in query expression.
+        ///     </para>
+        ///     <para>
+        ///         This property is typically used by database providers (and other extensions). It is generally
+        ///         not used in application code.
+        ///     </para>
         /// </summary>
+        public static readonly ParameterExpression QueryContextParameter = Expression.Parameter(typeof(QueryContext), "queryContext");
+
+        private readonly IQueryTranslationPreprocessorFactory _queryTranslationPreprocessorFactory;
+        private readonly IQueryableMethodTranslatingExpressionVisitorFactory _queryableMethodTranslatingExpressionVisitorFactory;
+        private readonly IQueryTranslationPostprocessorFactory _queryTranslationPostprocessorFactory;
+        private readonly IShapedQueryCompilingExpressionVisitorFactory _shapedQueryCompilingExpressionVisitorFactory;
+
         private Dictionary<string, LambdaExpression> _runtimeParameters;
 
+        /// <summary>
+        ///     Creates a new instance of the <see cref="QueryableMethodTranslatingExpressionVisitor" /> class.
+        /// </summary>
+        /// <param name="dependencies"> Parameter object containing dependencies for this convention. </param>
+        /// <param name="async"> A bool value indicating whether it is for async query. </param>
         public QueryCompilationContext(
-            QueryCompilationContextDependencies dependencies,
+            [NotNull] QueryCompilationContextDependencies dependencies,
             bool async)
         {
-            var context = dependencies.CurrentContext.Context;
+            Check.NotNull(dependencies, nameof(dependencies));
 
             IsAsync = async;
-            IsTracking = context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
+            IsTracking = dependencies.IsTracking;
+            IsBuffering = dependencies.IsRetryingExecutionStrategy;
             Model = dependencies.Model;
             ContextOptions = dependencies.ContextOptions;
-            ContextType = context.GetType();
+            ContextType = dependencies.ContextType;
             Logger = dependencies.Logger;
 
-            _queryOptimizerFactory = dependencies.QueryOptimizerFactory;
+            _queryTranslationPreprocessorFactory = dependencies.QueryTranslationPreprocessorFactory;
             _queryableMethodTranslatingExpressionVisitorFactory = dependencies.QueryableMethodTranslatingExpressionVisitorFactory;
-            _shapedQueryOptimizerFactory = dependencies.ShapedQueryOptimizerFactory;
+            _queryTranslationPostprocessorFactory = dependencies.QueryTranslationPostprocessorFactory;
             _shapedQueryCompilingExpressionVisitorFactory = dependencies.ShapedQueryCompilingExpressionVisitorFactory;
         }
 
+        /// <summary>
+        ///     A value indicating whether it is async query.
+        /// </summary>
         public virtual bool IsAsync { get; }
+
+        /// <summary>
+        ///     The model to use during query compilation.
+        /// </summary>
         public virtual IModel Model { get; }
+        /// <summary>
+        ///     The ContextOptions to use during query compilation.
+        /// </summary>
         public virtual IDbContextOptions ContextOptions { get; }
+
+        /// <summary>
+        ///     A value indicating whether it is tracking query.
+        /// </summary>
         public virtual bool IsTracking { get; internal set; }
+
+        /// <summary>
+        ///     <para>
+        ///         A value indicating whether query should perform identity resolution for the entities returned in the results.
+        ///     </para>
+        ///     <para>
+        ///         This value is only set when <see cref="IsTracking"/> is to <see langword="false"/>.
+        ///     </para>
+        /// </summary>
+        public virtual bool PerformIdentityResolution { get; internal set; }
+        /// <summary>
+        ///     A value indicating whether the underlying server query needs to pre-buffer all data.
+        /// </summary>
+        public virtual bool IsBuffering { get; }
+        /// <summary>
+        ///     A value indicating whether query filters are ignored in this query.
+        /// </summary>
+        public virtual bool IgnoreQueryFilters { get; internal set; }
+        /// <summary>
+        ///     The set of tags applied to this query.
+        /// </summary>
         public virtual ISet<string> Tags { get; } = new HashSet<string>();
+        /// <summary>
+        ///     The query logger to use during query compilation.
+        /// </summary>
         public virtual IDiagnosticsLogger<DbLoggerCategory.Query> Logger { get; }
+        /// <summary>
+        ///     The CLR type of derived DbContext to use during query compilation.
+        /// </summary>
         public virtual Type ContextType { get; }
 
-        public virtual void AddTag(string tag)
+        /// <summary>
+        ///     Adds a tag to <see cref="Tags"/>.
+        /// </summary>
+        /// <param name="tag"> The tag to add. </param>
+        public virtual void AddTag([NotNull] string tag)
         {
+            Check.NotEmpty(tag, nameof(tag));
+
             Tags.Add(tag);
         }
 
-        public virtual Func<QueryContext, TResult> CreateQueryExecutor<TResult>(Expression query)
+        /// <summary>
+        ///     Creates the query executor func which gives results for this query.
+        /// </summary>
+        /// <typeparam name="TResult"> The result type of this query. </typeparam>
+        /// <param name="query"> The query to generate executor for. </param>
+        /// <returns> Returns <see cref="Func{QueryContext, TResult}"/> which can be invoked to get results of this query. </returns>
+        public virtual Func<QueryContext, TResult> CreateQueryExecutor<TResult>([NotNull] Expression query)
         {
-            query = _queryOptimizerFactory.Create(this).Visit(query);
+            Check.NotNull(query, nameof(query));
+
+            query = _queryTranslationPreprocessorFactory.Create(this).Process(query);
             // Convert EntityQueryable to ShapedQueryExpression
-            query = _queryableMethodTranslatingExpressionVisitorFactory.Create(Model).Visit(query);
-            query = _shapedQueryOptimizerFactory.Create(this).Visit(query);
+            query = _queryableMethodTranslatingExpressionVisitorFactory.Create(this).Visit(query);
+            query = _queryTranslationPostprocessorFactory.Create(this).Process(query);
 
             // Inject actual entity materializer
             // Inject tracking
@@ -94,14 +176,15 @@ namespace Microsoft.EntityFrameworkCore.Query
         ///     A lambda must be provided, which will extract the parameter's value from the QueryContext every time
         ///     the query is executed.
         /// </summary>
-        public virtual void RegisterRuntimeParameter(string name, LambdaExpression valueExtractor)
+        public virtual ParameterExpression RegisterRuntimeParameter([NotNull] string name, [NotNull] LambdaExpression valueExtractor)
         {
+            Check.NotEmpty(name, nameof(name));
+            Check.NotNull(valueExtractor, nameof(valueExtractor));
+
             if (valueExtractor.Parameters.Count != 1
-                || valueExtractor.Parameters[0] != QueryContextParameter
-                || valueExtractor.ReturnType != typeof(object))
+                || valueExtractor.Parameters[0] != QueryContextParameter)
             {
-                throw new ArgumentException("Runtime parameter extraction lambda must have one QueryContext parameter and return an object",
-                    nameof(valueExtractor));
+                throw new ArgumentException(CoreStrings.RuntimeParameterMissingParameter, nameof(valueExtractor));
             }
 
             if (_runtimeParameters == null)
@@ -110,23 +193,26 @@ namespace Microsoft.EntityFrameworkCore.Query
             }
 
             _runtimeParameters[name] = valueExtractor;
+            return Expression.Parameter(valueExtractor.ReturnType, name);
         }
 
         private Expression InsertRuntimeParameters(Expression query)
             => _runtimeParameters == null
                 ? query
-                : Expression.Block(_runtimeParameters
-                    .Select(kv =>
-                        Expression.Call(
-                            QueryContextParameter,
-                            _queryContextAddParameterMethodInfo,
-                            Expression.Constant(kv.Key),
-                            Expression.Invoke(kv.Value, QueryContextParameter)))
-                    .Append(query));
+                : Expression.Block(
+                    _runtimeParameters
+                        .Select(
+                            kv =>
+                                Expression.Call(
+                                    QueryContextParameter,
+                                    _queryContextAddParameterMethodInfo,
+                                    Expression.Constant(kv.Key),
+                                    Expression.Convert(Expression.Invoke(kv.Value, QueryContextParameter), typeof(object))))
+                        .Append(query));
 
         private static readonly MethodInfo _queryContextAddParameterMethodInfo
             = typeof(QueryContext)
                 .GetTypeInfo()
-                .GetDeclaredMethod(nameof(QueryContext.Add));
+                .GetDeclaredMethod(nameof(QueryContext.AddParameter));
     }
 }

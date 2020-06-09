@@ -3,10 +3,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -30,12 +32,13 @@ namespace Microsoft.EntityFrameworkCore.Update
         private readonly List<IUpdateEntry> _entries = new List<IUpdateEntry>();
         private IReadOnlyList<ColumnModification> _columnModifications;
         private bool _requiresResultPropagation;
+        private bool _mainEntryAdded;
 
         /// <summary>
         ///     Initializes a new <see cref="ModificationCommand" /> instance.
         /// </summary>
         /// <param name="name"> The name of the table containing the data to be modified. </param>
-        /// <param name="schema"> The schema containing the table, or <c>null</c> to use the default schema. </param>
+        /// <param name="schema"> The schema containing the table, or <see langword="null" /> to use the default schema. </param>
         /// <param name="generateParameterName"> A delegate to generate parameter names. </param>
         /// <param name="sensitiveLoggingEnabled"> Indicates whether or not potentially sensitive data (e.g. database values) can be logged. </param>
         /// <param name="comparer"> A <see cref="IComparer{T}" /> for <see cref="IUpdateEntry" />s. </param>
@@ -61,7 +64,7 @@ namespace Microsoft.EntityFrameworkCore.Update
         ///     Initializes a new <see cref="ModificationCommand" /> instance.
         /// </summary>
         /// <param name="name"> The name of the table containing the data to be modified. </param>
-        /// <param name="schema"> The schema containing the table, or <c>null</c> to use the default schema. </param>
+        /// <param name="schema"> The schema containing the table, or <see langword="null" /> to use the default schema. </param>
         /// <param name="columnModifications"> The list of <see cref="ColumnModification" />s needed to perform the insert, update, or delete. </param>
         /// <param name="sensitiveLoggingEnabled"> Indicates whether or not potentially sensitive data (e.g. database values) can be logged. </param>
         public ModificationCommand(
@@ -84,9 +87,14 @@ namespace Microsoft.EntityFrameworkCore.Update
         public virtual string TableName { get; }
 
         /// <summary>
-        ///     The schema containing the table, or <c>null</c> to use the default schema.
+        ///     The schema containing the table, or <see langword="null" /> to use the default schema.
         /// </summary>
         public virtual string Schema { get; }
+
+        /// <summary>
+        ///     The command that needs to be executed before this one.
+        /// </summary>
+        public virtual ModificationCommand Predecessor { get; [param: CanBeNull] set; }
 
         /// <summary>
         ///     The <see cref="IUpdateEntry" />s that represent the entities that are mapped to the row
@@ -104,22 +112,10 @@ namespace Microsoft.EntityFrameworkCore.Update
         {
             get
             {
-                if (_entries.Count > 0)
+                if (_mainEntryAdded)
                 {
-                    for (var i = 0; i < _entries.Count; i++)
-                    {
-                        var entry = _entries[0];
-                        if (entry.SharedIdentityEntry != null)
-                        {
-                            return EntityState.Modified;
-                        }
-
-                        var state = entry.EntityState;
-                        if (state != EntityState.Unchanged)
-                        {
-                            return state;
-                        }
-                    }
+                    var entry = _entries[0];
+                    return entry.SharedIdentityEntry != null ? EntityState.Modified : entry.EntityState;
                 }
 
                 return EntityState.Modified;
@@ -130,7 +126,24 @@ namespace Microsoft.EntityFrameworkCore.Update
         ///     The list of <see cref="ColumnModification" />s needed to perform the insert, update, or delete.
         /// </summary>
         public virtual IReadOnlyList<ColumnModification> ColumnModifications
-            => NonCapturingLazyInitializer.EnsureInitialized(ref _columnModifications, this, command => command.GenerateColumnModifications());
+            => NonCapturingLazyInitializer.EnsureInitialized(
+                ref _columnModifications, this, command => command.GenerateColumnModifications());
+
+        /// <summary>
+        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
+        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
+        ///     any release. You should only use it directly in your code with extreme caution and knowing that
+        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
+        /// </summary>
+        [Conditional("DEBUG")]
+        [EntityFrameworkInternal]
+        public virtual void AssertColumnsNotInitialized()
+        {
+            if (_columnModifications != null)
+            {
+                throw new Exception($"_columnModifications have been initialized prematurely");
+            }
+        }
 
         /// <summary>
         ///     Indicates whether or not the database will return values for some mapped properties
@@ -151,7 +164,8 @@ namespace Microsoft.EntityFrameworkCore.Update
         ///     Adds an <see cref="IUpdateEntry" /> to this command representing an entity to be inserted, updated, or deleted.
         /// </summary>
         /// <param name="entry"> The entry representing the entity to add. </param>
-        public virtual void AddEntry([NotNull] IUpdateEntry entry)
+        /// <param name="mainEntry"> A value indicating whether this is the main entry for the row. </param>
+        public virtual void AddEntry([NotNull] IUpdateEntry entry, bool mainEntry)
         {
             Check.NotNull(entry, nameof(entry));
 
@@ -165,38 +179,65 @@ namespace Microsoft.EntityFrameworkCore.Update
                     throw new ArgumentException(RelationalStrings.ModificationCommandInvalidEntityState(entry.EntityState));
             }
 
-            if (_entries.Count > 0)
+            if (mainEntry)
             {
-                var currentState = EntityState;
-                var entryState = entry.SharedIdentityEntry == null
-                    ? entry.EntityState
-                    : EntityState.Modified;
-                if (currentState != entryState
-                    && entryState != EntityState.Unchanged)
-                {
-                    if (_sensitiveLoggingEnabled)
-                    {
-                        throw new InvalidOperationException(
-                            RelationalStrings.ConflictingRowUpdateTypesSensitive(
-                                entry.EntityType.DisplayName(),
-                                entry.BuildCurrentValuesString(entry.EntityType.FindPrimaryKey().Properties),
-                                entryState,
-                                _entries[0].EntityType.DisplayName(),
-                                _entries[0].BuildCurrentValuesString(_entries[0].EntityType.FindPrimaryKey().Properties),
-                                currentState));
-                    }
+                Check.DebugAssert(!_mainEntryAdded, "Only expected a single main entry");
 
-                    throw new InvalidOperationException(
-                        RelationalStrings.ConflictingRowUpdateTypes(
-                            entry.EntityType.DisplayName(),
-                            entryState,
-                            _entries[0].EntityType.DisplayName(),
-                            currentState));
+                for (var i = 0; i < _entries.Count; i++)
+                {
+                    ValidateState(entry, _entries[i]);
                 }
+
+                _mainEntryAdded = true;
+                _entries.Insert(0, entry);
+            }
+            else
+            {
+                if (_mainEntryAdded)
+                {
+                    ValidateState(_entries[0], entry);
+                }
+
+                _entries.Add(entry);
             }
 
-            _entries.Add(entry);
             _columnModifications = null;
+        }
+
+        private void ValidateState(IUpdateEntry mainEntry, IUpdateEntry entry)
+        {
+            var mainEntryState = mainEntry.SharedIdentityEntry == null
+                ? mainEntry.EntityState
+                : EntityState.Modified;
+            if (mainEntryState == EntityState.Modified)
+            {
+                return;
+            }
+
+            var entryState = entry.SharedIdentityEntry == null
+                ? entry.EntityState
+                : EntityState.Modified;
+            if (mainEntryState != entryState)
+            {
+                if (_sensitiveLoggingEnabled)
+                {
+                    throw new InvalidOperationException(
+                        RelationalStrings.ConflictingRowUpdateTypesSensitive(
+                            entry.EntityType.DisplayName(),
+                            entry.BuildCurrentValuesString(entry.EntityType.FindPrimaryKey().Properties),
+                            entryState,
+                            mainEntry.EntityType.DisplayName(),
+                            mainEntry.BuildCurrentValuesString(mainEntry.EntityType.FindPrimaryKey().Properties),
+                            mainEntryState));
+                }
+
+                throw new InvalidOperationException(
+                    RelationalStrings.ConflictingRowUpdateTypes(
+                        entry.EntityType.DisplayName(),
+                        entryState,
+                        mainEntry.EntityType.DisplayName(),
+                        mainEntryState));
+            }
         }
 
         private IReadOnlyList<ColumnModification> GenerateColumnModifications()
@@ -230,14 +271,26 @@ namespace Microsoft.EntityFrameworkCore.Update
 
             foreach (var entry in _entries)
             {
+                var nonMainEntry = updating
+                    && (entry.EntityState == EntityState.Deleted
+                        || entry.EntityState == EntityState.Added);
+
                 foreach (var property in entry.EntityType.GetProperties())
                 {
+                    var column = property.FindTableColumn(TableName, Schema);
+                    if (column == null)
+                    {
+                        continue;
+                    }
+
                     var isKey = property.IsPrimaryKey();
-                    var isConcurrencyToken = property.IsConcurrencyToken;
-                    var isCondition = !adding && (isKey || isConcurrencyToken);
+                    var isCondition = !adding && (isKey || property.IsConcurrencyToken);
                     var readValue = entry.IsStoreGenerated(property);
-                    var columnName = property.GetColumnName();
-                    var columnPropagator = sharedColumnMap?[columnName];
+                    ColumnValuePropagator columnPropagator = null;
+                    if (sharedColumnMap != null)
+                    {
+                        columnPropagator = sharedColumnMap[column.Name];
+                    }
 
                     var writeValue = false;
                     if (!readValue)
@@ -246,10 +299,11 @@ namespace Microsoft.EntityFrameworkCore.Update
                         {
                             writeValue = property.GetBeforeSaveBehavior() == PropertySaveBehavior.Save;
                         }
-                        else if (updating && property.GetAfterSaveBehavior() == PropertySaveBehavior.Save)
+                        else if ((updating && property.GetAfterSaveBehavior() == PropertySaveBehavior.Save)
+                            || (!isKey && nonMainEntry))
                         {
-                            writeValue = columnPropagator?.TryPropagate(property, (InternalEntityEntry)entry)
-                                         ?? entry.IsModified(property);
+                            writeValue = columnPropagator?.TryPropagate(property, entry)
+                                ?? entry.IsModified(property);
                         }
                     }
 
@@ -265,12 +319,12 @@ namespace Microsoft.EntityFrameworkCore.Update
                         var columnModification = new ColumnModification(
                             entry,
                             property,
+                            column,
                             _generateParameterName,
                             readValue,
                             writeValue,
                             isKey,
                             isCondition,
-                            isConcurrencyToken,
                             _sensitiveLoggingEnabled);
 
                         if (columnPropagator != null)
@@ -293,11 +347,16 @@ namespace Microsoft.EntityFrameworkCore.Update
             return columnModifications;
         }
 
-        private static void InitializeSharedColumns(IUpdateEntry entry, bool updating, Dictionary<string, ColumnValuePropagator> columnMap)
+        private void InitializeSharedColumns(IUpdateEntry entry, bool updating, Dictionary<string, ColumnValuePropagator> columnMap)
         {
             foreach (var property in entry.EntityType.GetProperties())
             {
-                var columnName = property.GetColumnName();
+                var columnName = property.FindTableColumn(TableName, Schema)?.Name;
+                if (columnName == null)
+                {
+                    continue;
+                }
+
                 if (!columnMap.TryGetValue(columnName, out var columnPropagator))
                 {
                     columnPropagator = new ColumnValuePropagator();
@@ -330,7 +389,20 @@ namespace Microsoft.EntityFrameworkCore.Update
             }
         }
 
-        private class ColumnValuePropagator
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            var result = $"{EntityState}: {TableName}";
+            if (_columnModifications == null)
+            {
+                return result;
+            }
+
+            result += "(" + string.Join(", ", _columnModifications.Where(m => m.IsKey).Select(m => m.OriginalValue.ToString())) + ")";
+            return result;
+        }
+
+        private sealed class ColumnValuePropagator
         {
             private bool _write;
             private object _originalValue;
@@ -343,33 +415,49 @@ namespace Microsoft.EntityFrameworkCore.Update
                 switch (entry.EntityState)
                 {
                     case EntityState.Modified:
-                        if (!_write && entry.IsModified(property))
+                        if (!_write
+                            && entry.IsModified(property))
                         {
                             _write = true;
                             _currentValue = entry.GetCurrentValue(property);
                         }
+
                         break;
                     case EntityState.Added:
-                        if (!_write)
+                        _currentValue = entry.GetCurrentValue(property);
+
+                        var comparer = property.GetValueComparer();
+                        if (comparer == null)
                         {
-                            _currentValue = entry.GetCurrentValue(property);
                             _write = !Equals(_originalValue, _currentValue);
                         }
+                        else
+                        {
+                            _write = !comparer.Equals(_originalValue, _currentValue);
+                        }
+
                         break;
                     case EntityState.Deleted:
                         _originalValue = entry.GetOriginalValue(property);
+                        if (!_write
+                            && !property.IsPrimaryKey())
+                        {
+                            _write = true;
+                            _currentValue = null;
+                        }
+
                         break;
                 }
             }
 
-            public bool TryPropagate(IProperty property, InternalEntityEntry entry)
+            public bool TryPropagate(IProperty property, IUpdateEntry entry)
             {
                 if (_write
                     && (entry.EntityState == EntityState.Unchanged
-                       || (entry.EntityState == EntityState.Modified && !entry.IsModified(property))
-                       || (entry.EntityState == EntityState.Added && Equals(_originalValue, entry.GetCurrentValue(property)))))
+                        || (entry.EntityState == EntityState.Modified && !entry.IsModified(property))
+                        || (entry.EntityState == EntityState.Added && Equals(_originalValue, entry.GetCurrentValue(property)))))
                 {
-                    entry[property] = _currentValue;
+                    entry.SetStoreGeneratedValue(property, _currentValue);
 
                     return false;
                 }

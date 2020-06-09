@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,9 +20,9 @@ namespace Microsoft.EntityFrameworkCore.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/>. This means a single instance
-    ///         is used by many <see cref="DbContext"/> instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public class DbSetFinder : IDbSetFinder
@@ -45,22 +46,16 @@ namespace Microsoft.EntityFrameworkCore.Internal
             return contextType.GetRuntimeProperties()
                 .Where(
                     p => !p.IsStatic()
-                         && !p.GetIndexParameters().Any()
-                         && p.DeclaringType != typeof(DbContext)
-                         && p.PropertyType.GetTypeInfo().IsGenericType
-                         && (p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>)
-#pragma warning disable CS0618 // Type or member is obsolete
-                             || p.PropertyType.GetGenericTypeDefinition() == typeof(DbQuery<>)))
-#pragma warning restore CS0618 // Type or member is obsolete
+                        && !p.GetIndexParameters().Any()
+                        && p.DeclaringType != typeof(DbContext)
+                        && p.PropertyType.GetTypeInfo().IsGenericType
+                        && p.PropertyType.GetGenericTypeDefinition() == typeof(DbSet<>))
                 .OrderBy(p => p.Name)
                 .Select(
                     p => new DbSetProperty(
                         p.Name,
-                        p.PropertyType.GetTypeInfo().GenericTypeArguments.Single(),
-                        p.SetMethod == null ? null : factory.Create(p),
-#pragma warning disable CS0618 // Type or member is obsolete
-                        p.PropertyType.GetGenericTypeDefinition() == typeof(DbQuery<>)))
-#pragma warning restore CS0618 // Type or member is obsolete
+                        p.PropertyType.GenericTypeArguments.Single(),
+                        p.SetMethod == null ? null : factory.Create(p)))
                 .ToArray();
         }
     }

@@ -23,9 +23,9 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/>. This means a single instance
-    ///         is used by many <see cref="DbContext"/> instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public class SqlServerModelValidator : RelationalModelValidator
@@ -51,12 +51,13 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         /// </summary>
         public override void Validate(IModel model, IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
+            ValidateIndexIncludeProperties(model, logger);
+
             base.Validate(model, logger);
 
             ValidateDefaultDecimalMapping(model, logger);
             ValidateByteIdentityMapping(model, logger);
             ValidateNonKeyValueGeneration(model, logger);
-            ValidateIndexIncludeProperties(model, logger);
         }
 
         /// <summary>
@@ -65,23 +66,29 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        protected virtual void ValidateDefaultDecimalMapping([NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        protected virtual void ValidateDefaultDecimalMapping(
+            [NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
             foreach (var property in model.GetEntityTypes()
                 .SelectMany(t => t.GetDeclaredProperties())
                 .Where(
                     p => p.ClrType.UnwrapNullableType() == typeof(decimal)
-                         && !p.IsForeignKey()))
+                        && !p.IsForeignKey()))
             {
-#pragma warning disable IDE0019 // Use pattern matching
-                var type = property.FindAnnotation(RelationalAnnotationNames.ColumnType) as ConventionAnnotation;
-#pragma warning restore IDE0019 // Use pattern matching
-                var typeMapping = property.FindAnnotation(CoreAnnotationNames.TypeMapping) as ConventionAnnotation;
-                if ((type == null
-                     && (typeMapping == null
-                         || ConfigurationSource.Convention.Overrides(typeMapping.GetConfigurationSource())))
-                    || (type != null
-                        && ConfigurationSource.Convention.Overrides(type.GetConfigurationSource())))
+                var valueConverterConfigurationSource = (property as IConventionProperty)?.GetValueConverterConfigurationSource();
+                var valueConverterProviderType = property.GetValueConverter()?.ProviderClrType;
+                if (!ConfigurationSource.Convention.Overrides(valueConverterConfigurationSource)
+                    && typeof(decimal) != valueConverterProviderType)
+                {
+                    continue;
+                }
+
+                var columnTypeConfigurationSource = (property as IConventionProperty)?.GetColumnTypeConfigurationSource();
+                var typeMappingConfigurationSource = (property as IConventionProperty)?.GetTypeMappingConfigurationSource();
+                if ((columnTypeConfigurationSource == null
+                        && ConfigurationSource.Convention.Overrides(typeMappingConfigurationSource))
+                    || (columnTypeConfigurationSource != null
+                        && ConfigurationSource.Convention.Overrides(columnTypeConfigurationSource)))
                 {
                     logger.DecimalTypeDefaultWarning(property);
                 }
@@ -94,15 +101,17 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        protected virtual void ValidateByteIdentityMapping([NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        protected virtual void ValidateByteIdentityMapping(
+            [NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
-            foreach (var property in model.GetEntityTypes()
-                .SelectMany(t => t.GetDeclaredProperties())
-                .Where(
-                    p => p.ClrType.UnwrapNullableType() == typeof(byte)
-                         && p.GetSqlServerValueGenerationStrategy() == SqlServerValueGenerationStrategy.IdentityColumn))
+            foreach (var entityType in model.GetEntityTypes())
             {
-                logger.ByteIdentityColumnWarning(property);
+                foreach (var property in entityType.GetDeclaredProperties()
+                    .Where(p => p.ClrType.UnwrapNullableType() == typeof(byte)
+                            && p.GetValueGenerationStrategy() == SqlServerValueGenerationStrategy.IdentityColumn))
+                {
+                    logger.ByteIdentityColumnWarning(property);
+                }
             }
         }
 
@@ -112,20 +121,22 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        protected virtual void ValidateNonKeyValueGeneration([NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        protected virtual void ValidateNonKeyValueGeneration(
+            [NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
-            foreach (var property in model.GetEntityTypes()
-                .SelectMany(t => t.GetDeclaredProperties())
-                .Where(
-                    p => p.GetSqlServerValueGenerationStrategy() == SqlServerValueGenerationStrategy.SequenceHiLo
-                         && ((IConventionProperty)p).GetSqlServerValueGenerationStrategyConfigurationSource() != null
-                         && !p.IsKey()
-                         && p.ValueGenerated != ValueGenerated.Never
-                         && (!(p.FindAnnotation(SqlServerAnnotationNames.ValueGenerationStrategy) is ConventionAnnotation strategy)
-                             || !ConfigurationSource.Convention.Overrides(strategy.GetConfigurationSource()))))
+            foreach (var entityType in model.GetEntityTypes())
             {
-                throw new InvalidOperationException(
-                    SqlServerStrings.NonKeyValueGeneration(property.Name, property.DeclaringEntityType.DisplayName()));
+                foreach (var property in entityType.GetDeclaredProperties()
+                    .Where(p => p.GetValueGenerationStrategy() == SqlServerValueGenerationStrategy.SequenceHiLo
+                            && ((IConventionProperty)p).GetValueGenerationStrategyConfigurationSource() != null
+                            && !p.IsKey()
+                            && p.ValueGenerated != ValueGenerated.Never
+                            && (!(p.FindAnnotation(SqlServerAnnotationNames.ValueGenerationStrategy) is IConventionAnnotation strategy)
+                                || !ConfigurationSource.Convention.Overrides(strategy.GetConfigurationSource()))))
+                {
+                    throw new InvalidOperationException(
+                        SqlServerStrings.NonKeyValueGeneration(property.Name, property.DeclaringEntityType.DisplayName()));
+                }
             }
         }
 
@@ -135,11 +146,12 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         ///     any release. You should only use it directly in your code with extreme caution and knowing that
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
-        protected virtual void ValidateIndexIncludeProperties([NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        protected virtual void ValidateIndexIncludeProperties(
+            [NotNull] IModel model, [NotNull] IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
             foreach (var index in model.GetEntityTypes().SelectMany(t => t.GetDeclaredIndexes()))
             {
-                var includeProperties = index.GetSqlServerIncludeProperties();
+                var includeProperties = index.GetIncludeProperties();
                 if (includeProperties?.Count > 0)
                 {
                     var notFound = includeProperties
@@ -182,14 +194,17 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override void ValidateSharedTableCompatibility(
-            IReadOnlyList<IEntityType> mappedTypes, string tableName, IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+            IReadOnlyList<IEntityType> mappedTypes,
+            string tableName,
+            string schema,
+            IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
             var firstMappedType = mappedTypes[0];
-            var isMemoryOptimized = firstMappedType.GetSqlServerIsMemoryOptimized();
+            var isMemoryOptimized = firstMappedType.IsMemoryOptimized();
 
             foreach (var otherMappedType in mappedTypes.Skip(1))
             {
-                if (isMemoryOptimized != otherMappedType.GetSqlServerIsMemoryOptimized())
+                if (isMemoryOptimized != otherMappedType.IsMemoryOptimized())
                 {
                     throw new InvalidOperationException(
                         SqlServerStrings.IncompatibleTableMemoryOptimizedMismatch(
@@ -199,7 +214,7 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
                 }
             }
 
-            base.ValidateSharedTableCompatibility(mappedTypes, tableName, logger);
+            base.ValidateSharedTableCompatibility(mappedTypes, tableName, schema, logger);
         }
 
         /// <summary>
@@ -209,26 +224,71 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
         ///     doing so can result in application failures when updating to a new Entity Framework Core release.
         /// </summary>
         protected override void ValidateSharedColumnsCompatibility(
-            IReadOnlyList<IEntityType> mappedTypes, string tableName, IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+            IReadOnlyList<IEntityType> mappedTypes,
+            string tableName,
+            string schema,
+            IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
-            base.ValidateSharedColumnsCompatibility(mappedTypes, tableName, logger);
+            base.ValidateSharedColumnsCompatibility(mappedTypes, tableName, schema, logger);
 
-            var identityColumns = new List<IProperty>();
-            var propertyMappings = new Dictionary<string, IProperty>();
+            var identityColumns = new Dictionary<string, IProperty>();
 
             foreach (var property in mappedTypes.SelectMany(et => et.GetDeclaredProperties()))
             {
-                var columnName = property.GetColumnName();
-                if (propertyMappings.TryGetValue(columnName, out var duplicateProperty))
+                if (property.GetValueGenerationStrategy(tableName, schema) == SqlServerValueGenerationStrategy.IdentityColumn)
                 {
-                    var propertyStrategy = property.GetSqlServerValueGenerationStrategy();
-                    var duplicatePropertyStrategy = duplicateProperty.GetSqlServerValueGenerationStrategy();
-                    if (propertyStrategy != duplicatePropertyStrategy
-                        && (propertyStrategy == SqlServerValueGenerationStrategy.IdentityColumn
-                            || duplicatePropertyStrategy == SqlServerValueGenerationStrategy.IdentityColumn))
+                    var columnName = property.GetColumnName(tableName, schema);
+                    if (columnName == null)
+                    {
+                        continue;
+                    }
+
+                    identityColumns[columnName] = property;
+                }
+            }
+
+            if (identityColumns.Count > 1)
+            {
+                var sb = new StringBuilder()
+                    .AppendJoin(identityColumns.Values.Select(p => "'" + p.DeclaringEntityType.DisplayName() + "." + p.Name + "'"));
+                throw new InvalidOperationException(SqlServerStrings.MultipleIdentityColumns(sb, tableName));
+            }
+        }
+
+        /// <inheritdoc />
+        protected override void ValidateCompatible(
+            IProperty property,
+            IProperty duplicateProperty,
+            string columnName,
+            string tableName,
+            string schema,
+            IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        {
+            base.ValidateCompatible(property, duplicateProperty, columnName, tableName, schema, logger);
+
+            var propertyStrategy = property.GetValueGenerationStrategy(tableName, schema);
+            var duplicatePropertyStrategy = duplicateProperty.GetValueGenerationStrategy(tableName, schema);
+            if (propertyStrategy != duplicatePropertyStrategy)
+            {
+                throw new InvalidOperationException(
+                    SqlServerStrings.DuplicateColumnNameValueGenerationStrategyMismatch(
+                        duplicateProperty.DeclaringEntityType.DisplayName(),
+                        duplicateProperty.Name,
+                        property.DeclaringEntityType.DisplayName(),
+                        property.Name,
+                        columnName,
+                        tableName));
+            }
+
+            switch (propertyStrategy)
+            {
+                case SqlServerValueGenerationStrategy.IdentityColumn:
+                    var increment = property.GetIdentityIncrement();
+                    var duplicateIncrement = duplicateProperty.GetIdentityIncrement();
+                    if (increment != duplicateIncrement)
                     {
                         throw new InvalidOperationException(
-                            SqlServerStrings.DuplicateColumnNameValueGenerationStrategyMismatch(
+                            SqlServerStrings.DuplicateColumnIdentityIncrementMismatch(
                                 duplicateProperty.DeclaringEntityType.DisplayName(),
                                 duplicateProperty.Name,
                                 property.DeclaringEntityType.DisplayName(),
@@ -236,61 +296,66 @@ namespace Microsoft.EntityFrameworkCore.SqlServer.Internal
                                 columnName,
                                 tableName));
                     }
-                }
-                else
-                {
-                    propertyMappings[columnName] = property;
-                    if (property.GetSqlServerValueGenerationStrategy() == SqlServerValueGenerationStrategy.IdentityColumn)
-                    {
-                        identityColumns.Add(property);
-                    }
-                }
-            }
 
-            if (identityColumns.Count > 1)
-            {
-                var sb = new StringBuilder()
-                    .AppendJoin(identityColumns.Select(p => "'" + p.DeclaringEntityType.DisplayName() + "." + p.Name + "'"));
-                throw new InvalidOperationException(SqlServerStrings.MultipleIdentityColumns(sb, tableName));
+                    var seed = property.GetIdentitySeed();
+                    var duplicateSeed = duplicateProperty.GetIdentitySeed();
+                    if (seed != duplicateSeed)
+                    {
+                        throw new InvalidOperationException(
+                            SqlServerStrings.DuplicateColumnIdentitySeedMismatch(
+                                duplicateProperty.DeclaringEntityType.DisplayName(),
+                                duplicateProperty.Name,
+                                property.DeclaringEntityType.DisplayName(),
+                                property.Name,
+                                columnName,
+                                tableName));
+                    }
+
+                    break;
+                case SqlServerValueGenerationStrategy.SequenceHiLo:
+                    if (property.GetHiLoSequenceName() != duplicateProperty.GetHiLoSequenceName()
+                        || property.GetHiLoSequenceSchema() != duplicateProperty.GetHiLoSequenceSchema())
+                    {
+                        throw new InvalidOperationException(
+                            SqlServerStrings.DuplicateColumnSequenceMismatch(
+                                duplicateProperty.DeclaringEntityType.DisplayName(),
+                                duplicateProperty.Name,
+                                property.DeclaringEntityType.DisplayName(),
+                                property.Name,
+                                columnName,
+                                tableName));
+                    }
+
+                    break;
             }
         }
 
-        /// <summary>
-        ///     This is an internal API that supports the Entity Framework Core infrastructure and not subject to
-        ///     the same compatibility standards as public APIs. It may be changed or removed without notice in
-        ///     any release. You should only use it directly in your code with extreme caution and knowing that
-        ///     doing so can result in application failures when updating to a new Entity Framework Core release.
-        /// </summary>
-        protected override void ValidateSharedKeysCompatibility(
-            IReadOnlyList<IEntityType> mappedTypes, string tableName, IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        /// <inheritdoc />
+        protected override void ValidateCompatible(
+            IKey key,
+            IKey duplicateKey,
+            string keyName,
+            string tableName,
+            string schema,
+            IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
         {
-            base.ValidateSharedKeysCompatibility(mappedTypes, tableName, logger);
+            base.ValidateCompatible(key, duplicateKey, keyName, tableName, schema, logger);
 
-            var keyMappings = new Dictionary<string, IKey>();
+            key.AreCompatibleForSqlServer(duplicateKey, tableName, schema, shouldThrow: true);
+        }
 
-            foreach (var key in mappedTypes.SelectMany(et => et.GetDeclaredKeys()))
-            {
-                var keyName = key.GetName();
+        /// <inheritdoc />
+        protected override void ValidateCompatible(
+            IIndex index,
+            IIndex duplicateIndex,
+            string indexName,
+            string tableName,
+            string schema,
+            IDiagnosticsLogger<DbLoggerCategory.Model.Validation> logger)
+        {
+            base.ValidateCompatible(index, duplicateIndex, indexName, tableName, schema, logger);
 
-                if (!keyMappings.TryGetValue(keyName, out var duplicateKey))
-                {
-                    keyMappings[keyName] = key;
-                    continue;
-                }
-
-                if (key.GetSqlServerIsClustered()
-                    != duplicateKey.GetSqlServerIsClustered())
-                {
-                    throw new InvalidOperationException(
-                        SqlServerStrings.DuplicateKeyMismatchedClustering(
-                            key.Properties.Format(),
-                            key.DeclaringEntityType.DisplayName(),
-                            duplicateKey.Properties.Format(),
-                            duplicateKey.DeclaringEntityType.DisplayName(),
-                            tableName,
-                            keyName));
-                }
-            }
+            index.AreCompatibleForSqlServer(duplicateIndex, tableName, schema, shouldThrow: true);
         }
     }
 }

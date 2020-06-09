@@ -21,74 +21,77 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         [ConditionalFact]
-        public async Task Browse_ReturnsViewWithGenre()
+        public virtual async Task Browse_ReturnsViewWithGenre()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    const string genreName = "Genre 1";
-                    CreateTestGenres(numberOfGenres: 3, numberOfAlbums: 3, context: context);
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        const string genreName = "Genre 1";
+                        CreateTestGenres(numberOfGenres: 3, numberOfAlbums: 3, context: context);
 
-                    var controller = new StoreController(context);
+                        var controller = new StoreController(context);
 
-                    var result = await controller.Browse(genreName);
+                        var result = await controller.Browse(genreName);
 
-                    Assert.Equal(genreName, result.Name);
-                    Assert.NotNull(result.Albums);
-                    Assert.Equal(3, result.Albums.Count);
-                }
-            }
+                        Assert.Equal(genreName, result.Name);
+                        Assert.NotNull(result.Albums);
+                        Assert.Equal(3, result.Albums.Count);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task Index_CreatesViewWithGenres()
+        public virtual async Task Index_CreatesViewWithGenres()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    CreateTestGenres(numberOfGenres: 10, numberOfAlbums: 1, context: context);
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        CreateTestGenres(numberOfGenres: 10, numberOfAlbums: 1, context: context);
 
-                    var controller = new StoreController(context);
+                        var controller = new StoreController(context);
 
-                    var result = await controller.Index();
+                        var result = await controller.Index();
 
-                    Assert.Equal(10, result.Count);
-                }
-            }
+                        Assert.Equal(10, result.Count);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task Details_ReturnsAlbumDetail()
+        public virtual async Task Details_ReturnsAlbumDetail()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var genres = CreateTestGenres(numberOfGenres: 3, numberOfAlbums: 3, context: context);
-                    var albumId = genres.First().Albums[2].AlbumId;
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var genres = CreateTestGenres(numberOfGenres: 3, numberOfAlbums: 3, context: context);
+                        var albumId = genres.First().Albums[2].AlbumId;
 
-                    var controller = new StoreController(context);
+                        var controller = new StoreController(context);
 
-                    var result = await controller.Details(albumId);
+                        var result = await controller.Details(albumId);
 
-                    Assert.NotNull(result.Genre);
-                    var genre = genres.SingleOrDefault(g => g.GenreId == result.GenreId);
-                    Assert.NotNull(genre);
-                    Assert.NotNull(genre.Albums.SingleOrDefault(a => a.AlbumId == albumId));
-                    Assert.NotNull(result.Artist);
-                    Assert.NotEqual(0, result.ArtistId);
-                }
-            }
+                        Assert.NotNull(result.Genre);
+                        var genre = genres.SingleOrDefault(g => g.GenreId == result.GenreId);
+                        Assert.NotNull(genre);
+                        Assert.NotNull(genre.Albums.SingleOrDefault(a => a.AlbumId == albumId));
+                        Assert.NotNull(result.Artist);
+                        Assert.NotEqual(0, result.ArtistId);
+                    }
+                });
         }
 
         private static Genre[] CreateTestGenres(int numberOfGenres, int numberOfAlbums, DbContext context)
         {
-            var artist = new Artist
-            {
-                Name = "Artist1"
-            };
+            var artist = new Artist { Name = "Artist1" };
 
             var genres = Enumerable.Range(1, numberOfGenres).Select(
                 g =>
@@ -97,10 +100,7 @@ namespace Microsoft.EntityFrameworkCore
                         Name = "Genre " + g,
                         Albums = Enumerable.Range(1, numberOfAlbums).Select(
                             n =>
-                                new Album
-                                {
-                                    Artist = artist, Title = "Greatest Hits"
-                                }).ToList()
+                                new Album { Artist = artist, Title = "Greatest Hits" }).ToList()
                     }).ToList();
 
             context.AddRange(genres);
@@ -110,28 +110,30 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         [ConditionalFact]
-        public async Task Index_GetsSixTopAlbums()
+        public virtual async Task Index_GetsSixTopAlbums()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var controller = new HomeController();
-
-                    var albums = TestAlbumDataProvider.GetAlbums();
-
-                    foreach (var album in albums)
+                    using (Fixture.BeginTransaction(context))
                     {
-                        context.Add(album);
+                        var controller = new HomeController();
+
+                        var albums = TestAlbumDataProvider.GetAlbums();
+
+                        foreach (var album in albums)
+                        {
+                            context.Add(album);
+                        }
+
+                        context.SaveChanges();
+
+                        var result = await controller.Index(context);
+
+                        Assert.Equal(6, result.Count);
                     }
-
-                    context.SaveChanges();
-
-                    var result = await controller.Index(context);
-
-                    Assert.Equal(6, result.Count);
-                }
-            }
+                });
         }
 
         private static class TestAlbumDataProvider
@@ -140,23 +142,19 @@ namespace Microsoft.EntityFrameworkCore
             {
                 var genres = Enumerable.Range(1, 10).Select(
                     n =>
-                        new Genre
-                        {
-                            Name = "Genre Name " + n
-                        }).ToArray();
+                        new Genre { Name = "Genre Name " + n }).ToArray();
 
                 var artists = Enumerable.Range(1, 10).Select(
                     n =>
-                        new Artist
-                        {
-                            Name = "Artist Name " + n
-                        }).ToArray();
+                        new Artist { Name = "Artist Name " + n }).ToArray();
 
                 var albums = Enumerable.Range(1, 10).Select(
                     n =>
                         new Album
                         {
-                            Artist = artists[n - 1], Genre = genres[n - 1], Title = "Greatest Hits"
+                            Artist = artists[n - 1],
+                            Genre = genres[n - 1],
+                            Title = "Greatest Hits"
                         }).ToArray();
 
                 return albums;
@@ -164,82 +162,77 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         [ConditionalFact]
-        public async Task GenreMenuComponent_Returns_NineGenres()
+        public virtual async Task GenreMenuComponent_Returns_NineGenres()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var genreMenuComponent = new GenreMenuComponent(context);
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var genreMenuComponent = new GenreMenuComponent(context);
 
-                    var genres = Enumerable.Range(1, 10).Select(
-                        n => new Genre
-                        {
-                            Name = $"G{n}"
-                        });
+                        var genres = Enumerable.Range(1, 10).Select(
+                            n => new Genre { Name = $"G{n}" });
 
-                    context.AddRange(genres);
-                    context.SaveChanges();
+                        context.AddRange(genres);
+                        context.SaveChanges();
 
-                    var result = await genreMenuComponent.InvokeAsync();
+                        var result = await genreMenuComponent.InvokeAsync();
 
-                    Assert.Equal(9, result.Count);
-                }
-            }
+                        Assert.Equal(9, result.Count);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task AddressAndPayment_RedirectToCompleteWhenSuccessful()
+        public virtual async Task AddressAndPayment_RedirectToCompleteWhenSuccessful()
         {
             const string cartId = "CartId_A";
 
             var order = CreateOrder();
 
-            var formCollection = new Dictionary<string, StringValues>
-            {
+            var formCollection = new Dictionary<string, StringValues> { { "PromoCode", new[] { "FREE" } } };
+
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    "PromoCode", new[]
+                    using (Fixture.BeginTransaction(context))
                     {
-                        "FREE"
+                        var cartItems = CreateTestCartItems(cartId, itemPrice: 10, numberOfItems: 1);
+                        context.AddRange(cartItems.Select(n => n.Album).Distinct());
+                        context.AddRange(cartItems);
+                        context.SaveChanges();
+
+                        var controller = new CheckoutController(formCollection);
+
+                        var result = await controller.AddressAndPayment(context, cartId, order);
+
+                        Assert.Equal(order.OrderId, result);
                     }
-                }
-            };
-
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
-                {
-                    var cartItems = CreateTestCartItems(cartId, itemPrice: 10, numberOfItems: 1);
-                    context.AddRange(cartItems.Select(n => n.Album).Distinct());
-                    context.AddRange(cartItems);
-                    context.SaveChanges();
-
-                    var controller = new CheckoutController(formCollection);
-
-                    var result = await controller.AddressAndPayment(context, cartId, order);
-
-                    Assert.Equal(order.OrderId, result);
-                }
-            }
+                });
         }
 
         [ConditionalFact]
-        public async Task AddressAndPayment_ReturnsOrderIfInvalidPromoCode()
+        public virtual async Task AddressAndPayment_ReturnsOrderIfInvalidPromoCode()
         {
             const string cartId = "CartId_A";
 
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var controller = new CheckoutController();
-                    var order = CreateOrder();
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var controller = new CheckoutController();
+                        var order = CreateOrder();
 
-                    var result = await controller.AddressAndPayment(context, cartId, order);
+                        var result = await controller.AddressAndPayment(context, cartId, order);
 
-                    Assert.Null(result);
-                }
-            }
+                        Assert.Null(result);
+                    }
+                });
         }
 
         protected Order CreateOrder(string userName = "RainbowDash")
@@ -258,255 +251,269 @@ namespace Microsoft.EntityFrameworkCore
             };
 
         [ConditionalFact]
-        public async Task Complete_ReturnsOrderIdIfValid()
+        public virtual async Task Complete_ReturnsOrderIdIfValid()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var controller = new CheckoutController();
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var controller = new CheckoutController();
 
-                    var order = context.Add(CreateOrder()).Entity;
-                    context.SaveChanges();
+                        var order = context.Add(CreateOrder()).Entity;
+                        context.SaveChanges();
 
-                    var result = await controller.Complete(context, order.OrderId);
+                        var result = await controller.Complete(context, order.OrderId);
 
-                    Assert.Equal(order.OrderId, result);
-                }
-            }
+                        Assert.Equal(order.OrderId, result);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task Complete_ReturnsErrorIfInvalidOrder()
+        public virtual async Task Complete_ReturnsErrorIfInvalidOrder()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var controller = new CheckoutController();
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var controller = new CheckoutController();
 
-                    var result = await controller.Complete(context, -3333);
+                        var result = await controller.Complete(context, -3333);
 
-                    Assert.Equal("Error", result);
-                }
-            }
+                        Assert.Equal("Error", result);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task CartSummaryComponent_returns_items()
+        public virtual async Task CartSummaryComponent_returns_items()
         {
             const string cartId = "CartId_A";
             const string albumTitle = "Good goat, M.A.A.D Village";
             const int itemCount = 10;
 
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var album = new Album
+                    using (Fixture.BeginTransaction(context))
                     {
-                        Title = albumTitle,
-                        Artist = new Artist
+                        var album = new Album
                         {
-                            Name = "Kung Fu Kenny"
-                        },
-                        Genre = new Genre
-                        {
-                            Name = "Rap"
-                        }
-                    };
+                            Title = albumTitle,
+                            Artist = new Artist { Name = "Kung Fu Kenny" },
+                            Genre = new Genre { Name = "Rap" }
+                        };
 
-                    var cartItems = Enumerable.Range(1, itemCount).Select(
-                        n =>
-                            new CartItem
-                            {
-                                Album = album, Count = 1, CartId = cartId
-                            }).ToArray();
+                        var cartItems = Enumerable.Range(1, itemCount).Select(
+                            n =>
+                                new CartItem
+                                {
+                                    Album = album,
+                                    Count = 1,
+                                    CartId = cartId
+                                }).ToArray();
 
-                    context.AddRange(cartItems);
-                    context.SaveChanges();
+                        context.AddRange(cartItems);
+                        context.SaveChanges();
 
-                    var result = await new CartSummaryComponent(context, cartId).InvokeAsync();
+                        var result = await new CartSummaryComponent(context, cartId).InvokeAsync();
 
-                    Assert.Equal(itemCount, result.CartCount);
-                    Assert.Equal(albumTitle, result.CartSummary);
-                }
-            }
+                        Assert.Equal(itemCount, result.CartCount);
+                        Assert.Equal(albumTitle, result.CartSummary);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public void Music_store_project_to_mapped_entity()
+        public virtual async void Music_store_project_to_mapped_entity()
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var albums = CreateTestAlbums(
-                        10,
-                        new Artist
-                        {
-                            Name = "Kung Fu Kenny"
-                        }, new Genre
-                        {
-                            Name = "Rap"
-                        });
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var albums = CreateTestAlbums(
+                            10,
+                            new Artist { Name = "Kung Fu Kenny" }, new Genre { Name = "Rap" });
 
-                    context.Albums.AddRange(albums);
-                    context.SaveChanges();
+                        context.Albums.AddRange(albums);
+                        await context.SaveChangesAsync();
 
-                    var q = from album in context.Albums
-                            join genre in context.Genres on album.GenreId equals genre.GenreId
-                            join artist in context.Artists on album.ArtistId equals artist.ArtistId
-                            select new Album
-                            {
-                                ArtistId = album.ArtistId,
-                                AlbumArtUrl = album.AlbumArtUrl,
-                                AlbumId = album.AlbumId,
-                                GenreId = album.GenreId,
-                                Price = album.Price,
-                                Title = album.Title,
-                                Artist = new Artist
+                        var q = from album in context.Albums
+                                join genre in context.Genres on album.GenreId equals genre.GenreId
+                                join artist in context.Artists on album.ArtistId equals artist.ArtistId
+                                select new Album
                                 {
-                                    ArtistId = album.ArtistId, Name = artist.Name
-                                },
-                                Genre = new Genre
-                                {
-                                    GenreId = album.GenreId, Name = genre.Name
-                                }
-                            };
+                                    ArtistId = album.ArtistId,
+                                    AlbumArtUrl = album.AlbumArtUrl,
+                                    AlbumId = album.AlbumId,
+                                    GenreId = album.GenreId,
+                                    Price = album.Price,
+                                    Title = album.Title,
+                                    Artist = new Artist { ArtistId = album.ArtistId, Name = artist.Name },
+                                    Genre = new Genre { GenreId = album.GenreId, Name = genre.Name }
+                                };
 
-                    var foundAlbums = q.ToList();
+                        var foundAlbums = q.ToList();
 
-                    Assert.Equal(10, foundAlbums.Count);
-                }
-            }
+                        Assert.Equal(10, foundAlbums.Count);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task RemoveFromCart_removes_items_from_cart()
+        public virtual async Task RemoveFromCart_removes_items_from_cart()
         {
             const string cartId = "CartId_A";
             const int numberOfItems = 5;
             const int unitPrice = 10;
 
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var cartItems = CreateTestCartItems(cartId, unitPrice, numberOfItems);
-                    context.AddRange(cartItems.Select(n => n.Album).Distinct());
-                    context.AddRange(cartItems);
-                    context.SaveChanges();
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var cartItems = CreateTestCartItems(cartId, unitPrice, numberOfItems);
+                        context.AddRange(cartItems.Select(n => n.Album).Distinct());
+                        context.AddRange(cartItems);
+                        context.SaveChanges();
 
-                    var controller = new ShoppingCartController(context, cartId);
+                        var controller = new ShoppingCartController(context, cartId);
 
-                    var cartItemId = cartItems[2].CartItemId;
-                    var viewModel = await controller.RemoveFromCart(cartItemId);
+                        var cartItemId = cartItems[2].CartItemId;
+                        var viewModel = await controller.RemoveFromCart(cartItemId);
 
-                    Assert.Equal(numberOfItems - 1, viewModel.CartCount);
-                    Assert.Equal((numberOfItems - 1) * 10, viewModel.CartTotal);
-                    Assert.Equal("Greatest Hits has been removed from your shopping cart.", viewModel.Message);
+                        Assert.Equal(numberOfItems - 1, viewModel.CartCount);
+                        Assert.Equal((numberOfItems - 1) * 10, viewModel.CartTotal);
+                        Assert.Equal("Greatest Hits has been removed from your shopping cart.", viewModel.Message);
 
-                    var cart = ShoppingCart.GetCart(context, cartId);
-                    Assert.DoesNotContain((await cart.GetCartItems()), c => c.CartItemId == cartItemId);
-                }
-            }
+                        var cart = ShoppingCart.GetCart(context, cartId);
+                        Assert.DoesNotContain((await cart.GetCartItems()), c => c.CartItemId == cartItemId);
+                    }
+                });
         }
 
         [ConditionalTheory]
         [InlineData(null)]
         [InlineData("CartId_A")]
-        public async Task Cart_is_empty_when_no_items_have_been_added(string cartId)
+        public virtual async Task Cart_is_empty_when_no_items_have_been_added(string cartId)
         {
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var controller = new ShoppingCartController(context, cartId);
-                    var viewModel = await controller.Index();
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var controller = new ShoppingCartController(context, cartId);
+                        var viewModel = await controller.Index();
 
-                    Assert.Empty(viewModel.CartItems);
-                    Assert.Equal(0, viewModel.CartTotal);
-                }
-            }
+                        Assert.Empty(viewModel.CartItems);
+                        Assert.Equal(0, viewModel.CartTotal);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task Cart_has_items_once_they_have_been_added()
+        public virtual async Task Cart_has_items_once_they_have_been_added()
         {
             const string cartId = "CartId_A";
 
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var cartItems = CreateTestCartItems(
-                        cartId,
-                        itemPrice: 10,
-                        numberOfItems: 5);
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var cartItems = CreateTestCartItems(
+                            cartId,
+                            itemPrice: 10,
+                            numberOfItems: 5);
 
-                    context.AddRange(cartItems.Select(n => n.Album).Distinct());
-                    context.AddRange(cartItems);
-                    context.SaveChanges();
+                        context.AddRange(cartItems.Select(n => n.Album).Distinct());
+                        context.AddRange(cartItems);
+                        context.SaveChanges();
 
-                    var controller = new ShoppingCartController(context, cartId);
-                    var viewModel = await controller.Index();
+                        var controller = new ShoppingCartController(context, cartId);
+                        var viewModel = await controller.Index();
 
-                    Assert.Equal(5, viewModel.CartItems.Count);
-                    Assert.Equal(5 * 10, viewModel.CartTotal);
-                }
-            }
+                        Assert.Equal(5, viewModel.CartItems.Count);
+                        Assert.Equal(5 * 10, viewModel.CartTotal);
+                    }
+                });
         }
 
         [ConditionalFact]
-        public async Task Can_add_items_to_cart()
+        public virtual async Task Can_add_items_to_cart()
         {
             const string cartId = "CartId_A";
 
-            using (var context = CreateContext())
-            {
-                using (Fixture.BeginTransaction(context))
+            using var context = CreateContext();
+            await context.Database.CreateExecutionStrategy().ExecuteAsync(
+                async () =>
                 {
-                    var albums = CreateTestAlbums(
-                        10,
-                        new Artist
-                        {
-                            Name = "Kung Fu Kenny"
-                        }, new Genre
-                        {
-                            Name = "Rap"
-                        });
+                    using (Fixture.BeginTransaction(context))
+                    {
+                        var albums = CreateTestAlbums(
+                            10,
+                            new Artist { Name = "Kung Fu Kenny" }, new Genre { Name = "Rap" });
 
-                    context.AddRange(albums);
-                    context.SaveChanges();
+                        context.AddRange(albums);
+                        context.SaveChanges();
 
-                    var controller = new ShoppingCartController(context, cartId);
-                    var albumId = albums[2].AlbumId;
-                    await controller.AddToCart(albumId);
+                        var controller = new ShoppingCartController(context, cartId);
+                        var albumId = albums[2].AlbumId;
+                        await controller.AddToCart(albumId);
 
-                    var cart = ShoppingCart.GetCart(context, cartId);
-                    Assert.Single(await cart.GetCartItems());
-                    Assert.Equal(albumId, (await cart.GetCartItems()).Single().AlbumId);
-                }
-            }
+                        var cart = ShoppingCart.GetCart(context, cartId);
+                        Assert.Single(await cart.GetCartItems());
+                        Assert.Equal(albumId, (await cart.GetCartItems()).Single().AlbumId);
+                    }
+                });
+        }
+
+        [ConditionalTheory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public virtual async Task Custom_projection_FirstOrDefault_works(bool async)
+        {
+            using var context = CreateContext();
+            var shoppingCartId = "CartId_A";
+            var id = 1;
+            var query = context.CartItems
+                .Select(ci => new CartItem
+                {
+                    CartId = ci.CartId,
+                    CartItemId = ci.CartItemId,
+                    Count = ci.Count,
+                    Album = new Album { Title = ci.Album.Title }
+                });
+
+            var cartItem = async
+                ? await query.FirstOrDefaultAsync(ci => ci.CartId == shoppingCartId && ci.CartItemId == id)
+                : query.FirstOrDefault(ci => ci.CartId == shoppingCartId && ci.CartItemId == id);
+
+            Assert.Null(cartItem);
         }
 
         private static CartItem[] CreateTestCartItems(string cartId, decimal itemPrice, int numberOfItems)
         {
             var albums = CreateTestAlbums(
                 itemPrice,
-                new Artist
-                {
-                    Name = "Kung Fu Kenny"
-                }, new Genre
-                {
-                    Name = "Rap"
-                });
+                new Artist { Name = "Kung Fu Kenny" }, new Genre { Name = "Rap" });
 
             var cartItems = Enumerable.Range(1, numberOfItems).Select(
                 n => new CartItem
                 {
-                    Count = 1, CartId = cartId, Album = albums[n % albums.Length]
+                    Count = 1,
+                    CartId = cartId,
+                    Album = albums[n % albums.Length]
                 }).ToArray();
 
             return cartItems;
@@ -518,7 +525,10 @@ namespace Microsoft.EntityFrameworkCore
                 n =>
                     new Album
                     {
-                        Title = "Greatest Hits", Price = itemPrice, Artist = artist, Genre = genre
+                        Title = "Greatest Hits",
+                        Price = itemPrice,
+                        Artist = artist,
+                        Genre = genre
                     }).ToArray();
         }
 
@@ -606,10 +616,7 @@ namespace Microsoft.EntityFrameworkCore
             {
                 var cart = ShoppingCart.GetCart(_context, _cartId);
 
-                var viewModel = new ShoppingCartViewModel
-                {
-                    CartItems = await cart.GetCartItems(), CartTotal = await cart.GetTotal()
-                };
+                var viewModel = new ShoppingCartViewModel { CartItems = await cart.GetCartItems(), CartTotal = await cart.GetTotal() };
 
                 return viewModel;
             }
@@ -669,8 +676,7 @@ namespace Microsoft.EntityFrameworkCore
                 var userName = "RainbowDash";
 
                 var isValid = await context.Orders.AnyAsync(
-                    o => o.OrderId == id &&
-                         o.Username == userName);
+                    o => o.OrderId == id && o.Username == userName);
 
                 if (isValid)
                 {

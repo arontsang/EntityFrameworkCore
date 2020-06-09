@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using JetBrains.Annotations;
@@ -26,12 +26,15 @@ namespace Microsoft.EntityFrameworkCore
 
             var coreOptionsBuilder = ((IRelationalDbContextOptionsBuilderInfrastructure)optionsBuilder).OptionsBuilder;
             var infrastructure = (IDbContextOptionsBuilderInfrastructure)coreOptionsBuilder;
+#pragma warning disable EF1001 // Internal EF Core API usage.
+            // #20566
             var sqliteExtension = coreOptionsBuilder.Options.FindExtension<SqliteOptionsExtension>()
-                                  ?? new SqliteOptionsExtension();
+                ?? new SqliteOptionsExtension();
             var ntsExtension = coreOptionsBuilder.Options.FindExtension<SqliteNetTopologySuiteOptionsExtension>()
-                               ?? new SqliteNetTopologySuiteOptionsExtension();
+                ?? new SqliteNetTopologySuiteOptionsExtension();
 
             infrastructure.AddOrUpdateExtension(sqliteExtension.WithLoadSpatialite(true));
+#pragma warning restore EF1001 // Internal EF Core API usage.
             infrastructure.AddOrUpdateExtension(ntsExtension);
 
             return optionsBuilder;

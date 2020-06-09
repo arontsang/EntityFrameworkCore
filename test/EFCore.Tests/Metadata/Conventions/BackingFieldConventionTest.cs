@@ -77,6 +77,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var property = entityType.AddProperty("SpeakToMe", typeof(int));
 
             RunConvention(property);
+            Validate(property);
 
             Assert.Null(property.GetFieldName());
         }
@@ -128,6 +129,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var property = entityType.AddProperty("SpeakToMe", typeof(int));
 
             RunConvention(property);
+            Validate(property);
 
             Assert.Null(property.GetFieldName());
         }
@@ -138,6 +140,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var property = entityType.AddProperty(propertyName, typeof(int));
 
             RunConvention(property);
+            Validate(property);
 
             Assert.Equal(fieldName, property.GetFieldName());
         }
@@ -149,6 +152,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var property = entityType.AddProperty(OfTheMoon.TheGreatGigInTheSkyProperty);
 
             RunConvention(property);
+            Validate(property);
 
             Assert.Equal("_theGreatGigInTheSky", property.GetFieldName());
         }
@@ -160,6 +164,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var property = entityType.AddProperty(TheDarkSide.OnBaseProperty);
 
             RunConvention(property);
+            Validate(property);
 
             Assert.Equal("_onBase", property.GetFieldName());
         }
@@ -170,11 +175,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var entityType = CreateModel().AddEntityType(typeof(AlwaysLookOnTheBrightSideOfLife));
             var property = entityType.AddProperty("OnTheRun", typeof(int));
 
+            RunConvention(property);
             Assert.Equal(
                 CoreStrings.ConflictingBackingFields(
                     "OnTheRun", nameof(AlwaysLookOnTheBrightSideOfLife), "_onTheRun", "m_onTheRun"),
                 Assert.Throws<InvalidOperationException>(
-                    () => RunConvention(property)).Message);
+                    () => Validate(property)).Message);
         }
 
         [ConditionalFact]
@@ -183,11 +189,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var entityType = CreateModel().AddEntityType(typeof(HesNotTheMessiah));
             var property = entityType.AddProperty("OnTheRun", typeof(int));
 
+            RunConvention(property);
             Assert.Equal(
                 CoreStrings.ConflictingBackingFields(
                     "OnTheRun", nameof(HesNotTheMessiah), "_onTheRun", "m_onTheRun"),
                 Assert.Throws<InvalidOperationException>(
-                    () => RunConvention(property)).Message);
+                    () => Validate(property)).Message);
         }
 
         [ConditionalFact]
@@ -196,11 +203,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
             var entityType = CreateModel().AddEntityType(typeof(HesAVeryNaughtyBoy));
             var property = entityType.AddProperty("OnTheRun", typeof(object));
 
+            RunConvention(property);
             Assert.Equal(
                 CoreStrings.ConflictingBackingFields(
                     "OnTheRun", nameof(HesAVeryNaughtyBoy), "_onTheRun", "m_onTheRun"),
                 Assert.Throws<InvalidOperationException>(
-                    () => RunConvention(property)).Message);
+                    () => Validate(property)).Message);
         }
 
         [ConditionalFact]
@@ -208,9 +216,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
         {
             var entityType = CreateModel().AddEntityType(typeof(AlwaysLookOnTheBrightSideOfLife));
             var property = entityType.AddProperty("OnTheRun", typeof(int));
-            property.SetField("m_onTheRun");
 
             RunConvention(property);
+
+            property.SetField("m_onTheRun");
+
+            Validate(property);
 
             Assert.Equal("m_onTheRun", property.GetFieldName());
         }
@@ -220,11 +231,37 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
         {
             var entityType = ((IConventionModel)CreateModel()).AddEntityType(typeof(AlwaysLookOnTheBrightSideOfLife));
             var property = entityType.AddProperty("OnTheRun", typeof(int));
-            property.SetField("m_onTheRun", fromDataAnnotation: true);
 
             RunConvention((IMutableProperty)property);
 
+            property.SetField("m_onTheRun", fromDataAnnotation: true);
+
+            Validate((IMutableProperty)property);
+
             Assert.Equal("m_onTheRun", property.GetFieldName());
+        }
+
+        [ConditionalFact]
+        public void Backing_field_is_not_discovered_for_indexer_property()
+        {
+            var entityType = CreateModel().AddEntityType(typeof(IndexedClass));
+            var property = entityType.AddIndexerProperty("Nation", typeof(string));
+
+            RunConvention(property);
+            Validate(property);
+
+            Assert.Null(property.GetFieldName());
+        }
+
+        [ConditionalFact]
+        public void Setting_field_on_indexer_property_throws()
+        {
+            var entityType = CreateModel().AddEntityType(typeof(IndexedClass));
+            var property = entityType.AddIndexerProperty("Nation", typeof(string));
+
+            Assert.Equal(
+                CoreStrings.BackingFieldOnIndexer("nation", entityType.DisplayName(), "Nation"),
+                Assert.Throws<InvalidOperationException>(() => property.SetField("nation")).Message);
         }
 
         private void RunConvention(IMutableProperty property)
@@ -232,6 +269,12 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 .ProcessPropertyAdded(
                     ((Property)property).Builder,
                     new ConventionContext<IConventionPropertyBuilder>(((Model)property.DeclaringEntityType.Model).ConventionDispatcher));
+
+        private void Validate(IMutableProperty property)
+            => new BackingFieldConvention(CreateDependencies())
+                .ProcessModelFinalizing(
+                    ((Property)property).DeclaringEntityType.Model.Builder,
+                    new ConventionContext<IConventionModelBuilder>(((Model)property.DeclaringEntityType.Model).ConventionDispatcher));
 
         private ProviderConventionSetBuilderDependencies CreateDependencies()
             => InMemoryTestHelpers.Instance.CreateContextServices().GetRequiredService<ProviderConventionSetBuilderDependencies>();
@@ -337,6 +380,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 set { m_Eclipse = value; }
             }
         }
+
         private class TheDarkerSideOfTheMoon
         {
             private readonly string m_SpeakToMe;
@@ -421,7 +465,7 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
 
             public int OnTheRun
             {
-                get { return (int)m_onTheRun; }
+                get { return m_onTheRun; }
                 set { m_onTheRun = value; }
             }
         }
@@ -436,6 +480,17 @@ namespace Microsoft.EntityFrameworkCore.Metadata.Conventions
                 get { return m_onTheRun; }
                 set { m_onTheRun = (int)value; }
             }
+        }
+
+        private class IndexedClass
+        {
+            private string nation;
+            private string _nation;
+            private string _Nation;
+            private string m_nation;
+            private string m_Nation;
+
+            public object this[string name] => null;
         }
 
 #pragma warning disable RCS1222 // Merge preprocessor directives.

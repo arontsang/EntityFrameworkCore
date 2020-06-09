@@ -1,10 +1,12 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -35,6 +37,9 @@ namespace Microsoft.EntityFrameworkCore.Query
     /// </summary>
     public sealed class QueryCompilationContextDependencies
     {
+        private readonly IExecutionStrategyFactory _executionStrategyFactory;
+        private readonly ICurrentDbContext _currentContext;
+
         /// <summary>
         ///     <para>
         ///         Creates the service dependencies parameter object for a <see cref="QueryCompilationContext" />.
@@ -57,37 +62,46 @@ namespace Microsoft.EntityFrameworkCore.Query
         [EntityFrameworkInternal]
         public QueryCompilationContextDependencies(
             [NotNull] IModel model,
-            [NotNull] IQueryOptimizerFactory queryOptimizerFactory,
+            [NotNull] IQueryTranslationPreprocessorFactory queryTranslationPreprocessorFactory,
             [NotNull] IQueryableMethodTranslatingExpressionVisitorFactory queryableMethodTranslatingExpressionVisitorFactory,
-            [NotNull] IShapedQueryOptimizerFactory shapedQueryOptimizerFactory,
+            [NotNull] IQueryTranslationPostprocessorFactory queryTranslationPostprocessorFactory,
             [NotNull] IShapedQueryCompilingExpressionVisitorFactory shapedQueryCompilingExpressionVisitorFactory,
+            [NotNull] IExecutionStrategyFactory executionStrategyFactory,
             [NotNull] ICurrentDbContext currentContext,
             [NotNull] IDbContextOptions contextOptions,
             [NotNull] IDiagnosticsLogger<DbLoggerCategory.Query> logger)
         {
             Check.NotNull(model, nameof(model));
-            Check.NotNull(queryOptimizerFactory, nameof(queryOptimizerFactory));
+            Check.NotNull(queryTranslationPreprocessorFactory, nameof(queryTranslationPreprocessorFactory));
             Check.NotNull(queryableMethodTranslatingExpressionVisitorFactory, nameof(queryableMethodTranslatingExpressionVisitorFactory));
-            Check.NotNull(shapedQueryOptimizerFactory, nameof(shapedQueryOptimizerFactory));
+            Check.NotNull(queryTranslationPostprocessorFactory, nameof(queryTranslationPostprocessorFactory));
             Check.NotNull(shapedQueryCompilingExpressionVisitorFactory, nameof(shapedQueryCompilingExpressionVisitorFactory));
+            Check.NotNull(executionStrategyFactory, nameof(executionStrategyFactory));
             Check.NotNull(currentContext, nameof(currentContext));
             Check.NotNull(contextOptions, nameof(contextOptions));
             Check.NotNull(logger, nameof(logger));
 
-            CurrentContext = currentContext;
+            _currentContext = currentContext;
             Model = model;
-            QueryOptimizerFactory = queryOptimizerFactory;
+            QueryTranslationPreprocessorFactory = queryTranslationPreprocessorFactory;
             QueryableMethodTranslatingExpressionVisitorFactory = queryableMethodTranslatingExpressionVisitorFactory;
-            ShapedQueryOptimizerFactory = shapedQueryOptimizerFactory;
+            QueryTranslationPostprocessorFactory = queryTranslationPostprocessorFactory;
             ShapedQueryCompilingExpressionVisitorFactory = shapedQueryCompilingExpressionVisitorFactory;
+            _executionStrategyFactory = executionStrategyFactory;
+            IsRetryingExecutionStrategy = executionStrategyFactory.Create().RetriesOnFailure;
             ContextOptions = contextOptions;
             Logger = logger;
         }
 
         /// <summary>
-        ///     The cache being used to store value generator instances.
+        ///     The CLR type of DbContext.
         /// </summary>
-        public ICurrentDbContext CurrentContext { get; }
+        public Type ContextType => _currentContext.Context.GetType();
+
+        /// <summary>
+        ///     The flag indicating if default query tracking behavior is tracking.
+        /// </summary>
+        public bool IsTracking => _currentContext.Context.ChangeTracker.QueryTrackingBehavior == QueryTrackingBehavior.TrackAll;
 
         /// <summary>
         ///     The model.
@@ -97,7 +111,7 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <summary>
         ///     The query optimizer factory.
         /// </summary>
-        public IQueryOptimizerFactory QueryOptimizerFactory { get; }
+        public IQueryTranslationPreprocessorFactory QueryTranslationPreprocessorFactory { get; }
 
         /// <summary>
         ///     The queryable method-translating expression visitor factory.
@@ -107,12 +121,17 @@ namespace Microsoft.EntityFrameworkCore.Query
         /// <summary>
         ///     The shaped-query optimizer factory
         /// </summary>
-        public IShapedQueryOptimizerFactory ShapedQueryOptimizerFactory { get; }
+        public IQueryTranslationPostprocessorFactory QueryTranslationPostprocessorFactory { get; }
 
         /// <summary>
         ///     The shaped-query compiling expression visitor factory.
         /// </summary>
         public IShapedQueryCompilingExpressionVisitorFactory ShapedQueryCompilingExpressionVisitorFactory { get; }
+
+        /// <summary>
+        ///     Whether the configured execution strategy can retry.
+        /// </summary>
+        public bool IsRetryingExecutionStrategy { get; }
 
         /// <summary>
         ///     The context options.
@@ -132,27 +151,29 @@ namespace Microsoft.EntityFrameworkCore.Query
         public QueryCompilationContextDependencies With([NotNull] IModel model)
             => new QueryCompilationContextDependencies(
                 model,
-                QueryOptimizerFactory,
+                QueryTranslationPreprocessorFactory,
                 QueryableMethodTranslatingExpressionVisitorFactory,
-                ShapedQueryOptimizerFactory,
+                QueryTranslationPostprocessorFactory,
                 ShapedQueryCompilingExpressionVisitorFactory,
-                CurrentContext,
+                _executionStrategyFactory,
+                _currentContext,
                 ContextOptions,
                 Logger);
 
         /// <summary>
         ///     Clones this dependency parameter object with one service replaced.
         /// </summary>
-        /// <param name="queryOptimizerFactory"> A replacement for the current dependency of this type. </param>
+        /// <param name="queryTranslationPreprocessorFactory"> A replacement for the current dependency of this type. </param>
         /// <returns> A new parameter object with the given service replaced. </returns>
-        public QueryCompilationContextDependencies With([NotNull] IQueryOptimizerFactory queryOptimizerFactory)
+        public QueryCompilationContextDependencies With([NotNull] IQueryTranslationPreprocessorFactory queryTranslationPreprocessorFactory)
             => new QueryCompilationContextDependencies(
                 Model,
-                queryOptimizerFactory,
+                queryTranslationPreprocessorFactory,
                 QueryableMethodTranslatingExpressionVisitorFactory,
-                ShapedQueryOptimizerFactory,
+                QueryTranslationPostprocessorFactory,
                 ShapedQueryCompilingExpressionVisitorFactory,
-                CurrentContext,
+                _executionStrategyFactory,
+                _currentContext,
                 ContextOptions,
                 Logger);
 
@@ -165,27 +186,30 @@ namespace Microsoft.EntityFrameworkCore.Query
             [NotNull] IQueryableMethodTranslatingExpressionVisitorFactory queryableMethodTranslatingExpressionVisitorFactory)
             => new QueryCompilationContextDependencies(
                 Model,
-                QueryOptimizerFactory,
+                QueryTranslationPreprocessorFactory,
                 queryableMethodTranslatingExpressionVisitorFactory,
-                ShapedQueryOptimizerFactory,
+                QueryTranslationPostprocessorFactory,
                 ShapedQueryCompilingExpressionVisitorFactory,
-                CurrentContext,
+                _executionStrategyFactory,
+                _currentContext,
                 ContextOptions,
                 Logger);
 
         /// <summary>
         ///     Clones this dependency parameter object with one service replaced.
         /// </summary>
-        /// <param name="shapedQueryOptimizerFactory"> A replacement for the current dependency of this type. </param>
+        /// <param name="queryTranslationPostprocessorFactory"> A replacement for the current dependency of this type. </param>
         /// <returns> A new parameter object with the given service replaced. </returns>
-        public QueryCompilationContextDependencies With([NotNull] IShapedQueryOptimizerFactory shapedQueryOptimizerFactory)
+        public QueryCompilationContextDependencies With(
+            [NotNull] IQueryTranslationPostprocessorFactory queryTranslationPostprocessorFactory)
             => new QueryCompilationContextDependencies(
                 Model,
-                QueryOptimizerFactory,
+                QueryTranslationPreprocessorFactory,
                 QueryableMethodTranslatingExpressionVisitorFactory,
-                shapedQueryOptimizerFactory,
+                queryTranslationPostprocessorFactory,
                 ShapedQueryCompilingExpressionVisitorFactory,
-                CurrentContext,
+                _executionStrategyFactory,
+                _currentContext,
                 ContextOptions,
                 Logger);
 
@@ -198,11 +222,29 @@ namespace Microsoft.EntityFrameworkCore.Query
             [NotNull] IShapedQueryCompilingExpressionVisitorFactory shapedQueryCompilingExpressionVisitorFactory)
             => new QueryCompilationContextDependencies(
                 Model,
-                QueryOptimizerFactory,
+                QueryTranslationPreprocessorFactory,
                 QueryableMethodTranslatingExpressionVisitorFactory,
-                ShapedQueryOptimizerFactory,
+                QueryTranslationPostprocessorFactory,
                 shapedQueryCompilingExpressionVisitorFactory,
-                CurrentContext,
+                _executionStrategyFactory,
+                _currentContext,
+                ContextOptions,
+                Logger);
+
+        /// <summary>
+        ///     Clones this dependency parameter object with one service replaced.
+        /// </summary>
+        /// <param name="executionStrategyFactory"> A replacement for the current dependency of this type. </param>
+        /// <returns> A new parameter object with the given service replaced. </returns>
+        public QueryCompilationContextDependencies With([NotNull] IExecutionStrategyFactory executionStrategyFactory)
+            => new QueryCompilationContextDependencies(
+                Model,
+                QueryTranslationPreprocessorFactory,
+                QueryableMethodTranslatingExpressionVisitorFactory,
+                QueryTranslationPostprocessorFactory,
+                ShapedQueryCompilingExpressionVisitorFactory,
+                executionStrategyFactory,
+                _currentContext,
                 ContextOptions,
                 Logger);
 
@@ -214,10 +256,11 @@ namespace Microsoft.EntityFrameworkCore.Query
         public QueryCompilationContextDependencies With([NotNull] ICurrentDbContext currentContext)
             => new QueryCompilationContextDependencies(
                 Model,
-                QueryOptimizerFactory,
+                QueryTranslationPreprocessorFactory,
                 QueryableMethodTranslatingExpressionVisitorFactory,
-                ShapedQueryOptimizerFactory,
+                QueryTranslationPostprocessorFactory,
                 ShapedQueryCompilingExpressionVisitorFactory,
+                _executionStrategyFactory,
                 currentContext,
                 ContextOptions,
                 Logger);
@@ -230,11 +273,12 @@ namespace Microsoft.EntityFrameworkCore.Query
         public QueryCompilationContextDependencies With([NotNull] IDbContextOptions contextOptions)
             => new QueryCompilationContextDependencies(
                 Model,
-                QueryOptimizerFactory,
+                QueryTranslationPreprocessorFactory,
                 QueryableMethodTranslatingExpressionVisitorFactory,
-                ShapedQueryOptimizerFactory,
+                QueryTranslationPostprocessorFactory,
                 ShapedQueryCompilingExpressionVisitorFactory,
-                CurrentContext,
+                _executionStrategyFactory,
+                _currentContext,
                 contextOptions,
                 Logger);
 
@@ -246,11 +290,12 @@ namespace Microsoft.EntityFrameworkCore.Query
         public QueryCompilationContextDependencies With([NotNull] IDiagnosticsLogger<DbLoggerCategory.Query> logger)
             => new QueryCompilationContextDependencies(
                 Model,
-                QueryOptimizerFactory,
+                QueryTranslationPreprocessorFactory,
                 QueryableMethodTranslatingExpressionVisitorFactory,
-                ShapedQueryOptimizerFactory,
+                QueryTranslationPostprocessorFactory,
                 ShapedQueryCompilingExpressionVisitorFactory,
-                CurrentContext,
+                _executionStrategyFactory,
+                _currentContext,
                 ContextOptions,
                 logger);
     }

@@ -22,13 +22,13 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// <param name="eventData"> Contextual information about the connection. </param>
         /// <param name="result">
         ///     Represents the current result if one exists.
-        ///     This value will have <see cref="InterceptionResult.IsSuppressed"/> set to true if some previous
-        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress"/>.
+        ///     This value will have <see cref="InterceptionResult.IsSuppressed" /> set to <see langword="true"/> if some previous
+        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress" />.
         ///     This value is typically used as the return value for the implementation of this method.
         /// </param>
         /// <returns>
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is false, the EF will continue as normal.
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is true, then EF will suppress the operation
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is false, the EF will continue as normal.
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is true, then EF will suppress the operation
         ///     it was about to perform.
         ///     A normal implementation of this method for any interceptor that is not attempting to suppress
         ///     the operation is to return the <paramref name="result" /> value passed in.
@@ -46,24 +46,24 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// <param name="eventData"> Contextual information about the connection. </param>
         /// <param name="result">
         ///     Represents the current result if one exists.
-        ///     This value will have <see cref="InterceptionResult.IsSuppressed"/> set to true if some previous
-        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress"/>.
+        ///     This value will have <see cref="InterceptionResult.IsSuppressed" /> set to <see langword="true"/> if some previous
+        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress" />.
         ///     This value is typically used as the return value for the implementation of this method.
         /// </param>
         /// <param name="cancellationToken"> The cancellation token. </param>
         /// <returns>
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is false, the EF will continue as normal.
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is true, then EF will suppress the operation
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is false, the EF will continue as normal.
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is true, then EF will suppress the operation
         ///     it was about to perform.
         ///     A normal implementation of this method for any interceptor that is not attempting to suppress
         ///     the operation is to return the <paramref name="result" /> value passed in.
         /// </returns>
-        public virtual Task<InterceptionResult> ConnectionOpeningAsync(
+        public virtual ValueTask<InterceptionResult> ConnectionOpeningAsync(
             DbConnection connection,
             ConnectionEventData eventData,
             InterceptionResult result,
             CancellationToken cancellationToken = default)
-            => Task.FromResult(result);
+            => new ValueTask<InterceptionResult>(result);
 
         /// <summary>
         ///     Called just after EF has called <see cref="DbConnection.Open()" />.
@@ -80,7 +80,7 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// <param name="connection"> The connection. </param>
         /// <param name="eventData"> Contextual information about the connection. </param>
         /// <param name="cancellationToken"> The cancellation token. </param>
-        /// <returns> A <see cref="Task"/> representing the asynchronous operation. </returns>
+        /// <returns> A <see cref="Task" /> representing the asynchronous operation. </returns>
         public virtual Task ConnectionOpenedAsync(
             DbConnection connection,
             ConnectionEndEventData eventData,
@@ -94,13 +94,13 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// <param name="eventData"> Contextual information about the connection. </param>
         /// <param name="result">
         ///     Represents the current result if one exists.
-        ///     This value will have <see cref="InterceptionResult.IsSuppressed"/> set to true if some previous
-        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress"/>.
+        ///     This value will have <see cref="InterceptionResult.IsSuppressed" /> set to <see langword="true"/> if some previous
+        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress" />.
         ///     This value is typically used as the return value for the implementation of this method.
         /// </param>
         /// <returns>
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is false, the EF will continue as normal.
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is true, then EF will suppress the operation
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is false, the EF will continue as normal.
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is true, then EF will suppress the operation
         ///     it was about to perform.
         ///     A normal implementation of this method for any interceptor that is not attempting to suppress
         ///     the operation is to return the <paramref name="result" /> value passed in.
@@ -118,22 +118,22 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// <param name="eventData"> Contextual information about the connection. </param>
         /// <param name="result">
         ///     Represents the current result if one exists.
-        ///     This value will have <see cref="InterceptionResult.IsSuppressed"/> set to true if some previous
-        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress"/>.
+        ///     This value will have <see cref="InterceptionResult.IsSuppressed" /> set to <see langword="true"/> if some previous
+        ///     interceptor suppressed execution by calling <see cref="InterceptionResult.Suppress" />.
         ///     This value is typically used as the return value for the implementation of this method.
         /// </param>
         /// <returns>
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is false, the EF will continue as normal.
-        ///     If <see cref="InterceptionResult.IsSuppressed"/> is true, then EF will suppress the operation
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is false, the EF will continue as normal.
+        ///     If <see cref="InterceptionResult.IsSuppressed" /> is true, then EF will suppress the operation
         ///     it was about to perform.
         ///     A normal implementation of this method for any interceptor that is not attempting to suppress
         ///     the operation is to return the <paramref name="result" /> value passed in.
         /// </returns>
-        public virtual Task<InterceptionResult> ConnectionClosingAsync(
+        public virtual ValueTask<InterceptionResult> ConnectionClosingAsync(
             DbConnection connection,
             ConnectionEventData eventData,
             InterceptionResult result)
-            => Task.FromResult(result);
+            => new ValueTask<InterceptionResult>(result);
 
         /// <summary>
         ///     Called just after EF has called <see cref="DbConnection.Close()" /> in an async context.
@@ -151,14 +151,14 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         /// </summary>
         /// <param name="connection"> The connection. </param>
         /// <param name="eventData"> Contextual information about the connection. </param>
-        /// <returns> A <see cref="Task"/> representing the asynchronous operation. </returns>
+        /// <returns> A <see cref="Task" /> representing the asynchronous operation. </returns>
         public virtual Task ConnectionClosedAsync(
             DbConnection connection,
             ConnectionEndEventData eventData)
             => Task.CompletedTask;
 
         /// <summary>
-        ///     Called when opening of a connection has failed with an exception. />.
+        ///     Called when opening of a connection has failed with an exception.
         /// </summary>
         /// <param name="connection"> The connection. </param>
         /// <param name="eventData"> Contextual information about the connection. </param>
@@ -169,12 +169,12 @@ namespace Microsoft.EntityFrameworkCore.Diagnostics
         }
 
         /// <summary>
-        ///     Called when opening of a connection has failed with an exception. />.
+        ///     Called when opening of a connection has failed with an exception.
         /// </summary>
         /// <param name="connection"> The connection. </param>
         /// <param name="eventData"> Contextual information about the connection. </param>
         /// <param name="cancellationToken"> The cancellation token. </param>
-        /// <returns> A <see cref="Task"/> representing the asynchronous operation. </returns>
+        /// <returns> A <see cref="Task" /> representing the asynchronous operation. </returns>
         public virtual Task ConnectionFailedAsync(
             DbConnection connection,
             ConnectionErrorEventData eventData,

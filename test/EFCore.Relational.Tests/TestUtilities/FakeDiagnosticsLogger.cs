@@ -21,6 +21,8 @@ namespace Microsoft.EntityFrameworkCore.TestUtilities
 
         public DiagnosticSource DiagnosticSource { get; } = new DiagnosticListener("Fake");
 
+        public IDbContextLogger DbContextLogger { get; } = new NullDbContextLogger();
+
         public void Log<TState>(
             LogLevel logLevel,
             EventId eventId,

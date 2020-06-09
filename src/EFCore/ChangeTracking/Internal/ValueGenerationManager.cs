@@ -21,8 +21,8 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -127,7 +127,8 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
             foreach (var property in FindGeneratingProperties(entry))
             {
                 var valueGenerator = GetValueGenerator(entry, property);
-                var generatedValue = await valueGenerator.NextAsync(entityEntry, cancellationToken);
+                var generatedValue = await valueGenerator.NextAsync(entityEntry, cancellationToken)
+                    .ConfigureAwait(false);
                 var temporary = valueGenerator.GeneratesTemporaryValues;
 
                 Log(entry, property, generatedValue, temporary);
@@ -178,7 +179,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking.Internal
         /// </summary>
         public virtual bool MayGetTemporaryValue(IProperty property, IEntityType entityType)
             => property.RequiresValueGenerator()
-               && _valueGeneratorSelector.Select(property, entityType).GeneratesTemporaryValues;
+                && _valueGeneratorSelector.Select(property, entityType).GeneratesTemporaryValues;
 
         private static void SetGeneratedValue(InternalEntityEntry entry, IProperty property, object generatedValue, bool isTemporary)
         {

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -14,33 +15,27 @@ namespace Microsoft.EntityFrameworkCore.Query
     public abstract class NorthwindQueryFixtureBase<TModelCustomizer> : SharedStoreFixtureBase<NorthwindContext>, IQueryFixtureBase
         where TModelCustomizer : IModelCustomizer, new()
     {
-        protected NorthwindQueryFixtureBase()
-        {
-            var entitySorters = new Dictionary<Type, Func<dynamic, object>>
+        public Func<DbContext> GetContextCreator() => () => CreateContext();
+
+        public ISetSource GetExpectedData() => new NorthwindData();
+
+        public IReadOnlyDictionary<Type, object> GetEntitySorters()
+            => new Dictionary<Type, Func<object, object>>
             {
-                { typeof(Customer), e => e?.CustomerID },
-                { typeof(CustomerView), e => e?.CompanyName },
-                { typeof(Order), e => e?.OrderID },
-                { typeof(OrderQuery), e => e?.CustomerID },
-                { typeof(Employee), e => e?.EmployeeID },
-                { typeof(Product), e => e?.ProductID },
-                { typeof(OrderDetail), e => e?.OrderID.ToString() + " " + e?.ProductID.ToString() }
-            };
+                { typeof(Customer), e => ((Customer)e)?.CustomerID },
+                { typeof(CustomerQuery), e => ((CustomerQuery)e)?.CompanyName },
+                { typeof(Order), e => ((Order)e)?.OrderID },
+                { typeof(OrderQuery), e => ((OrderQuery)e)?.CustomerID },
+                { typeof(Employee), e => ((Employee)e)?.EmployeeID },
+                { typeof(Product), e => ((Product)e)?.ProductID },
+                { typeof(OrderDetail), e => (((OrderDetail)e)?.OrderID.ToString(), ((OrderDetail)e)?.ProductID.ToString()) }
+            }.ToDictionary(e => e.Key, e => (object)e.Value);
 
-            var entityAsserters = new Dictionary<Type, Action<dynamic, dynamic>>();
-
-            QueryAsserter = new QueryAsserter<NorthwindContext>(
-                CreateContext,
-                new NorthwindData(),
-                entitySorters,
-                entityAsserters);
-        }
+        public IReadOnlyDictionary<Type, object> GetEntityAsserters() => null;
 
         protected override string StoreName { get; } = "Northwind";
 
         protected override bool UsePooling => typeof(TModelCustomizer) == typeof(NoopModelCustomizer);
-
-        public QueryAsserterBase QueryAsserter { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder, DbContext context)
             => new TModelCustomizer().Customize(modelBuilder, context);

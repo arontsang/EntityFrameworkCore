@@ -4,7 +4,6 @@
 using System.Collections;
 using System.Linq;
 using System.Text;
-using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Cosmos.Storage.Internal;
 using Microsoft.EntityFrameworkCore.ValueGeneration;
@@ -47,7 +46,7 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.ValueGeneration.Internal
                 builder.Append("|");
             }
 
-            var partitionKey = entityType.GetCosmosPartitionKeyPropertyName() ?? CosmosClientWrapper.DefaultPartitionKey;
+            var partitionKey = entityType.GetPartitionKeyPropertyName() ?? CosmosClientWrapper.DefaultPartitionKey;
             foreach (var property in pk.Properties)
             {
                 if (property.Name == partitionKey)
@@ -55,7 +54,16 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.ValueGeneration.Internal
                     continue;
                 }
 
-                AppendString(builder, entry.Property(property.Name).CurrentValue);
+                var value = entry.Property(property.Name).CurrentValue;
+
+                var converter = property.GetTypeMapping().Converter;
+                if (converter != null)
+                {
+                    value = converter.ConvertToProvider(value);
+                }
+
+                AppendString(builder, value);
+
                 builder.Append("|");
             }
 
@@ -77,9 +85,10 @@ namespace Microsoft.EntityFrameworkCore.Cosmos.ValueGeneration.Internal
                         builder.Append(item.ToString().Replace("|", "/|"));
                         builder.Append("|");
                     }
+
                     return;
                 default:
-                    builder.Append(propertyValue.ToString().Replace("|", "/|"));
+                    builder.Append(propertyValue == null ? "null" : propertyValue.ToString().Replace("|", "/|"));
                     return;
             }
         }

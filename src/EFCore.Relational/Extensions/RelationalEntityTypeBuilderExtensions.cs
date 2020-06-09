@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System;
 using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -17,10 +16,10 @@ namespace Microsoft.EntityFrameworkCore
     public static class RelationalEntityTypeBuilderExtensions
     {
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static EntityTypeBuilder ToTable(
             [NotNull] this EntityTypeBuilder entityTypeBuilder,
@@ -30,16 +29,18 @@ namespace Microsoft.EntityFrameworkCore
             Check.NullButNotEmpty(name, nameof(name));
 
             entityTypeBuilder.Metadata.SetTableName(name);
+            entityTypeBuilder.Metadata.SetSchema(null);
+            entityTypeBuilder.Metadata.RemoveAnnotation(RelationalAnnotationNames.ViewDefinitionSql);
 
             return entityTypeBuilder;
         }
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <typeparam name="TEntity"> The entity type being configured. </typeparam>
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static EntityTypeBuilder<TEntity> ToTable<TEntity>(
             [NotNull] this EntityTypeBuilder<TEntity> entityTypeBuilder,
@@ -48,11 +49,11 @@ namespace Microsoft.EntityFrameworkCore
             => (EntityTypeBuilder<TEntity>)ToTable((EntityTypeBuilder)entityTypeBuilder, name);
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
-        /// <param name="schema"> The schema of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
+        /// <param name="schema"> The schema of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static EntityTypeBuilder ToTable(
             [NotNull] this EntityTypeBuilder entityTypeBuilder,
@@ -65,17 +66,18 @@ namespace Microsoft.EntityFrameworkCore
 
             entityTypeBuilder.Metadata.SetTableName(name);
             entityTypeBuilder.Metadata.SetSchema(schema);
+            entityTypeBuilder.Metadata.RemoveAnnotation(RelationalAnnotationNames.ViewDefinitionSql);
 
             return entityTypeBuilder;
         }
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <typeparam name="TEntity"> The entity type being configured. </typeparam>
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
-        /// <param name="schema"> The schema of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
+        /// <param name="schema"> The schema of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static EntityTypeBuilder<TEntity> ToTable<TEntity>(
             [NotNull] this EntityTypeBuilder<TEntity> entityTypeBuilder,
@@ -85,10 +87,10 @@ namespace Microsoft.EntityFrameworkCore
             => (EntityTypeBuilder<TEntity>)ToTable((EntityTypeBuilder)entityTypeBuilder, name, schema);
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <param name="referenceOwnershipBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static OwnedNavigationBuilder ToTable(
             [NotNull] this OwnedNavigationBuilder referenceOwnershipBuilder,
@@ -103,12 +105,12 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <typeparam name="TEntity"> The entity type being configured. </typeparam>
         /// <typeparam name="TRelatedEntity"> The entity type that this relationship targets. </typeparam>
         /// <param name="referenceOwnershipBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static OwnedNavigationBuilder<TEntity, TRelatedEntity> ToTable<TEntity, TRelatedEntity>(
             [NotNull] this OwnedNavigationBuilder<TEntity, TRelatedEntity> referenceOwnershipBuilder,
@@ -118,11 +120,11 @@ namespace Microsoft.EntityFrameworkCore
             => (OwnedNavigationBuilder<TEntity, TRelatedEntity>)ToTable((OwnedNavigationBuilder)referenceOwnershipBuilder, name);
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <param name="referenceOwnershipBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
-        /// <param name="schema"> The schema of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
+        /// <param name="schema"> The schema of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static OwnedNavigationBuilder ToTable(
             [NotNull] this OwnedNavigationBuilder referenceOwnershipBuilder,
@@ -140,13 +142,13 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <typeparam name="TEntity"> The entity type being configured. </typeparam>
         /// <typeparam name="TRelatedEntity"> The entity type that this relationship targets. </typeparam>
         /// <param name="referenceOwnershipBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
-        /// <param name="schema"> The schema of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
+        /// <param name="schema"> The schema of the table. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
         public static OwnedNavigationBuilder<TEntity, TRelatedEntity> ToTable<TEntity, TRelatedEntity>(
             [NotNull] this OwnedNavigationBuilder<TEntity, TRelatedEntity> referenceOwnershipBuilder,
@@ -157,14 +159,14 @@ namespace Microsoft.EntityFrameworkCore
             => (OwnedNavigationBuilder<TEntity, TRelatedEntity>)ToTable((OwnedNavigationBuilder)referenceOwnershipBuilder, name, schema);
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder ToTable(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder, [CanBeNull] string name, bool fromDataAnnotation = false)
@@ -179,15 +181,15 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         /// <summary>
-        ///     Configures the view or table that the entity type maps to when targeting a relational database.
+        ///     Configures the table that the entity type maps to when targeting a relational database.
         /// </summary>
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
-        /// <param name="schema"> The schema of the view or table. </param>
+        /// <param name="name"> The name of the table. </param>
+        /// <param name="schema"> The schema of the table. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder ToTable(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
@@ -212,7 +214,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
         /// <param name="name"> The name of the view or table. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the configuration can be applied. </returns>
+        /// <returns> <see langword="true" /> if the configuration can be applied. </returns>
         public static bool CanSetTable(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder, [CanBeNull] string name, bool fromDataAnnotation = false)
         {
@@ -229,7 +231,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder ToSchema(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
@@ -252,7 +254,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
         /// <param name="schema"> The schema of the view or table. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the configuration can be applied. </returns>
+        /// <returns> <see langword="true" /> if the configuration can be applied. </returns>
         public static bool CanSetSchema(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
             [CanBeNull] string schema,
@@ -264,12 +266,11 @@ namespace Microsoft.EntityFrameworkCore
         }
 
         /// <summary>
-        ///     Configures the view or table that the view maps to when targeting a relational database.
+        ///     Configures the view that the entity type maps to when targeting a relational database.
         /// </summary>
-        /// <param name="entityTypeBuilder"> The builder for the query type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
+        /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
+        /// <param name="name"> The name of the view. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
-        [Obsolete("Use ToTable() instead")]
         public static EntityTypeBuilder ToView(
             [NotNull] this EntityTypeBuilder entityTypeBuilder,
             [CanBeNull] string name)
@@ -277,19 +278,20 @@ namespace Microsoft.EntityFrameworkCore
             Check.NotNull(entityTypeBuilder, nameof(entityTypeBuilder));
             Check.NullButNotEmpty(name, nameof(name));
 
-            entityTypeBuilder.Metadata.SetTableName(name);
+            entityTypeBuilder.Metadata.SetViewName(name);
+            entityTypeBuilder.Metadata.SetViewSchema(null);
+            entityTypeBuilder.Metadata.SetAnnotation(RelationalAnnotationNames.ViewDefinitionSql, null);
 
             return entityTypeBuilder;
         }
 
         /// <summary>
-        ///     Configures the view or table that the view maps to when targeting a relational database.
+        ///     Configures the view that the entity type maps to when targeting a relational database.
         /// </summary>
-        /// <typeparam name="TEntity"> The query type being configured. </typeparam>
-        /// <param name="entityTypeBuilder"> The builder for the query type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
+        /// <typeparam name="TEntity"> The entity type being configured. </typeparam>
+        /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
+        /// <param name="name"> The name of the view. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
-        [Obsolete("Use ToTable() instead")]
         public static EntityTypeBuilder<TEntity> ToView<TEntity>(
             [NotNull] this EntityTypeBuilder<TEntity> entityTypeBuilder,
             [CanBeNull] string name)
@@ -297,13 +299,12 @@ namespace Microsoft.EntityFrameworkCore
             => (EntityTypeBuilder<TEntity>)ToView((EntityTypeBuilder)entityTypeBuilder, name);
 
         /// <summary>
-        ///     Configures the view or table that the view maps to when targeting a relational database.
+        ///     Configures the view that the entity type maps to when targeting a relational database.
         /// </summary>
-        /// <param name="entityTypeBuilder"> The builder for the query type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
-        /// <param name="schema"> The schema of the view or table. </param>
+        /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
+        /// <param name="name"> The name of the view. </param>
+        /// <param name="schema"> The schema of the view. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
-        [Obsolete("Use ToTable() instead")]
         public static EntityTypeBuilder ToView(
             [NotNull] this EntityTypeBuilder entityTypeBuilder,
             [CanBeNull] string name,
@@ -313,21 +314,21 @@ namespace Microsoft.EntityFrameworkCore
             Check.NullButNotEmpty(name, nameof(name));
             Check.NullButNotEmpty(schema, nameof(schema));
 
-            entityTypeBuilder.Metadata.SetTableName(name);
-            entityTypeBuilder.Metadata.SetSchema(schema);
+            entityTypeBuilder.Metadata.SetViewName(name);
+            entityTypeBuilder.Metadata.SetViewSchema(schema);
+            entityTypeBuilder.Metadata.SetAnnotation(RelationalAnnotationNames.ViewDefinitionSql, null);
 
             return entityTypeBuilder;
         }
 
         /// <summary>
-        ///     Configures the view or table that the view maps to when targeting a relational database.
+        ///     Configures the view that the entity type maps to when targeting a relational database.
         /// </summary>
-        /// <typeparam name="TEntity"> The query type being configured. </typeparam>
-        /// <param name="entityTypeBuilder"> The builder for the query type being configured. </param>
-        /// <param name="name"> The name of the view or table. </param>
-        /// <param name="schema"> The schema of the view or table. </param>
+        /// <typeparam name="TEntity"> The entity type being configured. </typeparam>
+        /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
+        /// <param name="name"> The name of the view. </param>
+        /// <param name="schema"> The schema of the view. </param>
         /// <returns> The same builder instance so that multiple calls can be chained. </returns>
-        [Obsolete("Use ToTable() instead")]
         public static EntityTypeBuilder<TEntity> ToView<TEntity>(
             [NotNull] this EntityTypeBuilder<TEntity> entityTypeBuilder,
             [CanBeNull] string name,
@@ -358,6 +359,7 @@ namespace Microsoft.EntityFrameworkCore
             {
                 if (constraint.Sql == sql)
                 {
+                    ((CheckConstraint)constraint).UpdateConfigurationSource(ConfigurationSource.Explicit);
                     return entityTypeBuilder;
                 }
 
@@ -396,7 +398,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the check constraint was configured,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder HasCheckConstraint(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
@@ -415,13 +417,13 @@ namespace Microsoft.EntityFrameworkCore
             {
                 if (constraint.Sql == sql)
                 {
-                   ((CheckConstraint)constraint).UpdateConfigurationSource(
+                    ((CheckConstraint)constraint).UpdateConfigurationSource(
                         fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention);
                     return entityTypeBuilder;
                 }
 
                 if (!(fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention)
-                    .Overrides(constraint.GetConfigurationSource()))
+                        .Overrides(constraint.GetConfigurationSource()))
                 {
                     return null;
                 }
@@ -444,7 +446,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="name"> The name of the check constraint. </param>
         /// <param name="sql"> The logical constraint sql used in the check constraint. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the configuration can be applied. </returns>
+        /// <returns> <see langword="true" /> if the configuration can be applied. </returns>
         public static bool CanSetCheckConstraint(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
             [NotNull] string name,
@@ -458,9 +460,9 @@ namespace Microsoft.EntityFrameworkCore
             var constraint = entityTypeBuilder.Metadata.FindCheckConstraint(name);
 
             return constraint == null
-                   || constraint.Sql == sql
-                   || (fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention)
-                   .Overrides(constraint.GetConfigurationSource());
+                || constraint.Sql == sql
+                || (fromDataAnnotation ? ConfigurationSource.DataAnnotation : ConfigurationSource.Convention)
+                    .Overrides(constraint.GetConfigurationSource());
         }
 
         /// <summary>
@@ -500,7 +502,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionEntityTypeBuilder HasComment(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
@@ -525,7 +527,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="entityTypeBuilder"> The builder for the entity type being configured. </param>
         /// <param name="comment"> The comment for the table. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the configuration can be applied. </returns>
+        /// <returns> <see langword="true" /> if the configuration can be applied. </returns>
         public static bool CanSetComment(
             [NotNull] this IConventionEntityTypeBuilder entityTypeBuilder,
             [CanBeNull] string comment,
@@ -534,6 +536,5 @@ namespace Microsoft.EntityFrameworkCore
                 RelationalAnnotationNames.Comment,
                 comment,
                 fromDataAnnotation);
-
     }
 }

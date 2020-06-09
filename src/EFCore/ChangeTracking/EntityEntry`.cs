@@ -9,7 +9,6 @@ using JetBrains.Annotations;
 using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Utilities;
 
@@ -59,7 +58,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
         {
             Check.NotNull(propertyExpression, nameof(propertyExpression));
 
-            return new PropertyEntry<TEntity, TProperty>(InternalEntry, propertyExpression.GetPropertyAccess().GetSimpleMemberName());
+            return new PropertyEntry<TEntity, TProperty>(InternalEntry, propertyExpression.GetMemberAccess().GetSimpleMemberName());
         }
 
         /// <summary>
@@ -80,7 +79,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
         {
             Check.NotNull(propertyExpression, nameof(propertyExpression));
 
-            return new ReferenceEntry<TEntity, TProperty>(InternalEntry, propertyExpression.GetPropertyAccess().GetSimpleMemberName());
+            return new ReferenceEntry<TEntity, TProperty>(InternalEntry, propertyExpression.GetMemberAccess().GetSimpleMemberName());
         }
 
         /// <summary>
@@ -101,7 +100,7 @@ namespace Microsoft.EntityFrameworkCore.ChangeTracking
         {
             Check.NotNull(propertyExpression, nameof(propertyExpression));
 
-            return new CollectionEntry<TEntity, TProperty>(InternalEntry, propertyExpression.GetPropertyAccess().GetSimpleMemberName());
+            return new CollectionEntry<TEntity, TProperty>(InternalEntry, propertyExpression.GetMemberAccess().GetSimpleMemberName());
         }
 
         /// <summary>

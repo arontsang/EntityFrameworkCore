@@ -22,8 +22,8 @@ namespace Microsoft.EntityFrameworkCore.Storage
     ///         not used in application code.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -50,6 +50,13 @@ namespace Microsoft.EntityFrameworkCore.Storage
             [NotNull] IList<IUpdateEntry> entries,
             CancellationToken cancellationToken = default);
 
+        /// <summary>
+        ///     Compiles the given query to generate a <see cref="Func{QueryContext, TResult}"/>.
+        /// </summary>
+        /// <typeparam name="TResult"> The type of query result. </typeparam>
+        /// <param name="query"> The query to compile. </param>
+        /// <param name="async"> A value indicating whether this is an async query. </param>
+        /// <returns> A <see cref="Func{QueryContext, TResult}"/> which can be invoked to get results of the query. </returns>
         Func<QueryContext, TResult> CompileQuery<TResult>([NotNull] Expression query, bool async);
     }
 }

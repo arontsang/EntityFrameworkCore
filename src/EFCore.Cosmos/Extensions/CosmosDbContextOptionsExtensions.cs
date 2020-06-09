@@ -1,10 +1,10 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
 using JetBrains.Annotations;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Cosmos.Infrastructure.Internal;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Utilities;
 
 // ReSharper disable once CheckNamespace
@@ -23,7 +23,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="accountEndpoint"> The account end-point to connect to. </param>
         /// <param name="accountKey"> The account key. </param>
         /// <param name="databaseName"> The database name. </param>
-        /// <param name="cosmosOptionsAction">An optional action to allow additional Cosmos-specific configuration.</param>
+        /// <param name="cosmosOptionsAction"> An optional action to allow additional Cosmos-specific configuration. </param>
         /// <returns> The options builder so that further configuration can be chained. </returns>
         public static DbContextOptionsBuilder<TContext> UseCosmos<TContext>(
             [NotNull] this DbContextOptionsBuilder<TContext> optionsBuilder,
@@ -46,7 +46,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="accountEndpoint"> The account end-point to connect to. </param>
         /// <param name="accountKey"> The account key. </param>
         /// <param name="databaseName"> The database name. </param>
-        /// <param name="cosmosOptionsAction">An optional action to allow additional Cosmos-specific configuration.</param>
+        /// <param name="cosmosOptionsAction"> An optional action to allow additional Cosmos-specific configuration. </param>
         /// <returns> The options builder so that further configuration can be chained. </returns>
         public static DbContextOptionsBuilder UseCosmos(
             [NotNull] this DbContextOptionsBuilder optionsBuilder,

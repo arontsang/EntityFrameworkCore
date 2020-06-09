@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -23,9 +23,9 @@ namespace Microsoft.EntityFrameworkCore.Storage
     ///         not used in application code.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/>. This means a single instance
-    ///         is used by many <see cref="DbContext"/> instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" />. This means a single instance
+    ///         is used by many <see cref="DbContext" /> instances. The implementation must be thread-safe.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public interface ITypeMappingSource
@@ -34,7 +34,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         ///     Finds the type mapping for a given <see cref="IProperty" />.
         /// </summary>
         /// <param name="property"> The property. </param>
-        /// <returns> The type mapping, or <c>null</c> if none was found. </returns>
+        /// <returns> The type mapping, or <see langword="null" /> if none was found. </returns>
         CoreTypeMapping FindMapping([NotNull] IProperty property);
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         ///     </para>
         /// </summary>
         /// <param name="member"> The field or property. </param>
-        /// <returns> The type mapping, or <c>null</c> if none was found. </returns>
+        /// <returns> The type mapping, or <see langword="null" /> if none was found. </returns>
         CoreTypeMapping FindMapping([NotNull] MemberInfo member);
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace Microsoft.EntityFrameworkCore.Storage
         ///     </para>
         /// </summary>
         /// <param name="type"> The CLR type. </param>
-        /// <returns> The type mapping, or <c>null</c> if none was found. </returns>
+        /// <returns> The type mapping, or <see langword="null" /> if none was found. </returns>
         CoreTypeMapping FindMapping([NotNull] Type type);
     }
 }

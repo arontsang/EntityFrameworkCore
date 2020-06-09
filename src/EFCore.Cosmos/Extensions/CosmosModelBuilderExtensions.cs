@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using JetBrains.Annotations;
@@ -28,7 +28,7 @@ namespace Microsoft.EntityFrameworkCore
             Check.NotNull(modelBuilder, nameof(modelBuilder));
             Check.NullButNotEmpty(name, nameof(name));
 
-            modelBuilder.Model.SetCosmosDefaultContainer(name);
+            modelBuilder.Model.SetDefaultContainer(name);
 
             return modelBuilder;
         }
@@ -42,7 +42,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
         /// <returns>
         ///     The same builder instance if the configuration was applied,
-        ///     <c>null</c> otherwise.
+        ///     <see langword="null" /> otherwise.
         /// </returns>
         public static IConventionModelBuilder HasDefaultContainer(
             [NotNull] this IConventionModelBuilder modelBuilder,
@@ -54,7 +54,7 @@ namespace Microsoft.EntityFrameworkCore
                 return null;
             }
 
-            modelBuilder.Metadata.SetCosmosDefaultContainer(name, fromDataAnnotation);
+            modelBuilder.Metadata.SetDefaultContainer(name, fromDataAnnotation);
 
             return modelBuilder;
         }
@@ -65,7 +65,7 @@ namespace Microsoft.EntityFrameworkCore
         /// <param name="modelBuilder"> The model builder. </param>
         /// <param name="name"> The default container name. </param>
         /// <param name="fromDataAnnotation"> Indicates whether the configuration was specified using a data annotation. </param>
-        /// <returns> <c>true</c> if the given container name can be set as default. </returns>
+        /// <returns> <see langword="true" /> if the given container name can be set as default. </returns>
         public static bool CanSetDefaultContainer(
             [NotNull] this IConventionModelBuilder modelBuilder,
             [CanBeNull] string name,

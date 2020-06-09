@@ -1,11 +1,9 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System;
 using System.Data.Common;
 using Microsoft.Data.Sqlite.Properties;
 using SQLitePCL;
-
 using static SQLitePCL.raw;
 
 namespace Microsoft.Data.Sqlite
@@ -13,6 +11,7 @@ namespace Microsoft.Data.Sqlite
     /// <summary>
     ///     Represents a SQLite error.
     /// </summary>
+    /// <seealso href="https://docs.microsoft.com/dotnet/standard/data/sqlite/database-errors">Database Errors</seealso>
     public class SqliteException : DbException
     {
         /// <summary>
@@ -42,14 +41,14 @@ namespace Microsoft.Data.Sqlite
         ///     Gets the SQLite error code.
         /// </summary>
         /// <value>The SQLite error code.</value>
-        /// <seealso href="http://sqlite.org/rescode.html">SQLite Result Codes</seealso>
+        /// <seealso href="https://www.sqlite.org/rescode.html">SQLite Result Codes</seealso>
         public virtual int SqliteErrorCode { get; }
 
         /// <summary>
         ///     Gets the extended SQLite error code.
         /// </summary>
         /// <value>The SQLite error code.</value>
-        /// <seealso href="https://sqlite.org/rescode.html#extrc">SQLite Result Codes</seealso>
+        /// <seealso href="https://www.sqlite.org/rescode.html#extrc">SQLite Result Codes</seealso>
         public virtual int SqliteExtendedErrorCode { get; }
 
         /// <summary>

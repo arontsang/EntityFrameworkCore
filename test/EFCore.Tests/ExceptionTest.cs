@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.TestUtilities;
 using Microsoft.EntityFrameworkCore.Update;
 using Xunit;
+
 // ReSharper disable InconsistentNaming
 
 namespace Microsoft.EntityFrameworkCore
@@ -96,10 +97,7 @@ namespace Microsoft.EntityFrameworkCore
                     new DbUpdateException(
                         "But somehow the vital connection is made",
                         new Exception("Bang!"),
-                        new IUpdateEntry[]
-                        {
-                            new FakeUpdateEntry()
-                        })));
+                        new IUpdateEntry[] { new FakeUpdateEntry() })));
 
             Assert.Equal("But somehow the vital connection is made", transportedException.Message);
             Assert.Equal("Bang!", transportedException.InnerException.Message);
@@ -149,10 +147,7 @@ namespace Microsoft.EntityFrameworkCore
                     new DbUpdateConcurrencyException(
                         "But somehow the vital connection is made",
                         new Exception("Bang!"),
-                        new IUpdateEntry[]
-                        {
-                            new FakeUpdateEntry()
-                        })));
+                        new IUpdateEntry[] { new FakeUpdateEntry() })));
 
             Assert.Equal("But somehow the vital connection is made", transportedException.Message);
             Assert.Equal("Bang!", transportedException.InnerException.Message);
@@ -175,6 +170,9 @@ namespace Microsoft.EntityFrameworkCore
             public TProperty GetOriginalValue<TProperty>(IProperty property) => throw new NotImplementedException();
             public void SetStoreGeneratedValue(IProperty property, object value) => throw new NotImplementedException();
             public EntityEntry ToEntityEntry() => new EntityEntry(new FakeInternalEntityEntry());
+            public object GetRelationshipSnapshotValue(IPropertyBase propertyBase) => throw new NotImplementedException();
+            public object GetPreStoreGeneratedCurrentValue(IPropertyBase propertyBase) => throw new NotImplementedException();
+            public bool IsConceptualNull(IProperty property) => throw new NotImplementedException();
         }
 
         private class FakeInternalEntityEntry : InternalEntityEntry
@@ -195,7 +193,8 @@ namespace Microsoft.EntityFrameworkCore
             return entityType;
         }
 
-        private TException SerializeAndDeserialize<TException>(TException exception) where TException : Exception
+        private TException SerializeAndDeserialize<TException>(TException exception)
+            where TException : Exception
         {
             var stream = new MemoryStream();
             var formatter = new BinaryFormatter();

@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation. All rights reserved.
+// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -20,10 +20,10 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Singleton"/> and multiple registrations
-    ///         are allowed. This means a single instance of each service is used by many <see cref="DbContext"/>
+    ///         The service lifetime is <see cref="ServiceLifetime.Singleton" /> and multiple registrations
+    ///         are allowed. This means a single instance of each service is used by many <see cref="DbContext" />
     ///         instances. The implementation must be thread-safe.
-    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped"/>.
+    ///         This service cannot depend on services registered as <see cref="ServiceLifetime.Scoped" />.
     ///     </para>
     /// </summary>
     public class SqliteNetTopologySuiteTypeMappingSourcePlugin : IRelationalTypeMappingSourcePlugin
@@ -32,13 +32,37 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
             = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase)
             {
                 { "GEOMETRY", typeof(Geometry) },
+                { "GEOMETRYZ", typeof(Geometry) },
+                { "GEOMETRYM", typeof(Geometry) },
+                { "GEOMETRYZM", typeof(Geometry) },
                 { "GEOMETRYCOLLECTION", typeof(GeometryCollection) },
+                { "GEOMETRYCOLLECTIONZ", typeof(GeometryCollection) },
+                { "GEOMETRYCOLLECTIONM", typeof(GeometryCollection) },
+                { "GEOMETRYCOLLECTIONZM", typeof(GeometryCollection) },
                 { "LINESTRING", typeof(LineString) },
+                { "LINESTRINGZ", typeof(LineString) },
+                { "LINESTRINGM", typeof(LineString) },
+                { "LINESTRINGZM", typeof(LineString) },
                 { "MULTILINESTRING", typeof(MultiLineString) },
+                { "MULTILINESTRINGZ", typeof(MultiLineString) },
+                { "MULTILINESTRINGM", typeof(MultiLineString) },
+                { "MULTILINESTRINGZM", typeof(MultiLineString) },
                 { "MULTIPOINT", typeof(MultiPoint) },
+                { "MULTIPOINTZ", typeof(MultiPoint) },
+                { "MULTIPOINTM", typeof(MultiPoint) },
+                { "MULTIPOINTZM", typeof(MultiPoint) },
                 { "MULTIPOLYGON", typeof(MultiPolygon) },
+                { "MULTIPOLYGONZ", typeof(MultiPolygon) },
+                { "MULTIPOLYGONM", typeof(MultiPolygon) },
+                { "MULTIPOLYGONZM", typeof(MultiPolygon) },
                 { "POINT", typeof(Point) },
-                { "POLYGON", typeof(Polygon) }
+                { "POINTZ", typeof(Point) },
+                { "POINTM", typeof(Point) },
+                { "POINTZM", typeof(Point) },
+                { "POLYGON", typeof(Polygon) },
+                { "POLYGONZ", typeof(Polygon) },
+                { "POLYGONM", typeof(Polygon) },
+                { "POLYGONZM", typeof(Polygon) }
             };
 
         private readonly NtsGeometryServices _geometryServices;
@@ -71,13 +95,13 @@ namespace Microsoft.EntityFrameworkCore.Sqlite.Storage.Internal
 
             return (clrType != null
                     && TryGetDefaultStoreType(clrType, out defaultStoreType))
-                   || (storeTypeName != null
-                       && _storeTypeMappings.TryGetValue(storeTypeName, out defaultClrType))
-                ? (RelationalTypeMapping)Activator.CreateInstance(
-                    typeof(SqliteGeometryTypeMapping<>).MakeGenericType(clrType ?? defaultClrType ?? typeof(Geometry)),
-                    _geometryServices,
-                    storeTypeName ?? defaultStoreType ?? "GEOMETRY")
-                : null;
+                || (storeTypeName != null
+                    && _storeTypeMappings.TryGetValue(storeTypeName, out defaultClrType))
+                    ? (RelationalTypeMapping)Activator.CreateInstance(
+                        typeof(SqliteGeometryTypeMapping<>).MakeGenericType(clrType ?? defaultClrType ?? typeof(Geometry)),
+                        _geometryServices,
+                        storeTypeName ?? defaultStoreType ?? "GEOMETRY")
+                    : null;
         }
 
         private static bool TryGetDefaultStoreType(Type clrType, out string defaultStoreType)

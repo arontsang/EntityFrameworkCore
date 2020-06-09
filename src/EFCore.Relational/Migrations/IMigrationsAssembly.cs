@@ -15,8 +15,8 @@ namespace Microsoft.EntityFrameworkCore.Migrations
     ///         A service representing an assembly containing EF Core Migrations.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/>. This means that each
-    ///         <see cref="DbContext"/> instance will use its own instance of this service.
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" />. This means that each
+    ///         <see cref="DbContext" /> instance will use its own instance of this service.
     ///         The implementation may depend on other services registered with any lifetime.
     ///         The implementation does not need to be thread-safe.
     ///     </para>
@@ -44,7 +44,7 @@ namespace Microsoft.EntityFrameworkCore.Migrations
         ///     just its identifier.
         /// </summary>
         /// <param name="nameOrId"> The name or identifier to lookup. </param>
-        /// <returns> The identifier of the migration, or <c>null</c> if none was found. </returns>
+        /// <returns> The identifier of the migration, or <see langword="null" /> if none was found. </returns>
         string FindMigrationId([NotNull] string nameOrId);
 
         /// <summary>

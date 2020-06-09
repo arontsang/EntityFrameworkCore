@@ -18,8 +18,8 @@ namespace Microsoft.EntityFrameworkCore.Proxies.Internal
     ///         doing so can result in application failures when updating to a new Entity Framework Core release.
     ///     </para>
     ///     <para>
-    ///         The service lifetime is <see cref="ServiceLifetime.Scoped"/> and multiple registrations
-    ///         are allowed. This means that each <see cref="DbContext"/> instance will use its own
+    ///         The service lifetime is <see cref="ServiceLifetime.Scoped" /> and multiple registrations
+    ///         are allowed. This means that each <see cref="DbContext" /> instance will use its own
     ///         set of instances of this service.
     ///         The implementations may depend on other services registered with any lifetime.
     ///         The implementations do not need to be thread-safe.
@@ -58,14 +58,18 @@ namespace Microsoft.EntityFrameworkCore.Proxies.Internal
         /// </summary>
         public virtual ConventionSet ModifyConventions(ConventionSet conventionSet)
         {
-            ConventionSet.AddBefore(
-                conventionSet.ModelFinalizedConventions,
-                new ProxyBindingRewriter(
+            var extension = _options.FindExtension<ProxiesOptionsExtension>();
+
+            ConventionSet.AddAfter(
+                conventionSet.ModelInitializedConventions,
+                new ProxyChangeTrackingConvention(extension),
+                typeof(DbSetFindingConvention));
+
+            conventionSet.ModelFinalizingConventions.Add(new ProxyBindingRewriter(
                     _proxyFactory,
-                    _options.FindExtension<ProxiesOptionsExtension>(),
+                    extension,
                     _lazyLoaderParameterBindingFactoryDependencies,
-                    _conventionSetBuilderDependencies),
-                typeof(ValidatingConvention));
+                    _conventionSetBuilderDependencies));
 
             return conventionSet;
         }

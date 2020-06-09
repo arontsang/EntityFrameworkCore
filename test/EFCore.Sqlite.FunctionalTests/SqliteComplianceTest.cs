@@ -14,17 +14,7 @@ namespace Microsoft.EntityFrameworkCore
         {
             typeof(FromSqlSprocQueryTestBase<>),
             typeof(SqlExecutorTestBase<>),
-            typeof(UdfDbFunctionTestBase<>),
-            typeof(ComplexNavigationsWeakQueryTestBase<>), // issue #15285
-            typeof(FiltersInheritanceTestBase<>),          // issue #15264
-            typeof(FiltersTestBase<>),                     // issue #15264
-            typeof(QueryFilterFuncletizationTestBase<>),   // issue #15264
-            // Query pipeline
-            typeof(ConcurrencyDetectorTestBase<>),
-            typeof(CompiledQueryTestBase<>),
-            typeof(ConcurrencyDetectorRelationalTestBase<>),
-            typeof(QueryNoClientEvalTestBase<>),
-            typeof(WarningsTestBase<>),
+            typeof(UdfDbFunctionTestBase<>)
         };
 
         protected override Assembly TargetAssembly { get; } = typeof(SqliteComplianceTest).Assembly;

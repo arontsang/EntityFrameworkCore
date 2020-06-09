@@ -13,14 +13,6 @@ namespace Microsoft.Data.Sqlite
     public class SqliteParameterTest
     {
         [Fact]
-        public void Ctor_validates_arguments()
-        {
-            var ex = Assert.Throws<ArgumentNullException>(() => new SqliteParameter(null, 1));
-
-            Assert.Equal("name", ex.ParamName);
-        }
-
-        [Fact]
         public void Ctor_sets_name_and_value()
         {
             var result = new SqliteParameter("@Parameter", 1);
@@ -38,6 +30,44 @@ namespace Microsoft.Data.Sqlite
             Assert.Equal(SqliteType.Integer, result.SqliteType);
             Assert.Equal(8, result.Size);
             Assert.Equal("Column", result.SourceColumn);
+        }
+
+        [Fact]
+        public void ParameterName_defaults_to_empty()
+        {
+            var parameter = new SqliteParameter();
+
+            Assert.Empty(parameter.ParameterName);
+        }
+
+        [Fact]
+        public void ParameterName_coalesces_to_empty()
+        {
+            var parameter = new SqliteParameter
+            {
+                ParameterName = null
+            };
+
+            Assert.Empty(parameter.ParameterName);
+        }
+
+        [Fact]
+        public void SourceColumn_defaults_to_empty()
+        {
+            var parameter = new SqliteParameter();
+
+            Assert.Empty(parameter.SourceColumn);
+        }
+
+        [Fact]
+        public void SourceColumn_coalesces_to_empty()
+        {
+            var parameter = new SqliteParameter
+            {
+                SourceColumn = null
+            };
+
+            Assert.Empty(parameter.SourceColumn);
         }
 
         [Fact]
@@ -77,20 +107,9 @@ namespace Microsoft.Data.Sqlite
         }
 
         [Fact]
-        public void ParameterName_validates_value()
-        {
-            var ex = Assert.Throws<ArgumentNullException>(() => new SqliteParameter().ParameterName = null);
-            Assert.Equal("value", ex.ParamName);
-        }
-
-        [Fact]
         public void ResetDbType_works()
         {
-            var parameter = new SqliteParameter
-            {
-                DbType = DbType.Int64,
-                SqliteType = SqliteType.Integer
-            };
+            var parameter = new SqliteParameter { DbType = DbType.Int64, SqliteType = SqliteType.Integer };
 
             parameter.ResetDbType();
 
@@ -101,11 +120,7 @@ namespace Microsoft.Data.Sqlite
         [Fact]
         public void ResetSqliteType_works()
         {
-            var parameter = new SqliteParameter
-            {
-                DbType = DbType.Int64,
-                SqliteType = SqliteType.Integer
-            };
+            var parameter = new SqliteParameter { DbType = DbType.Int64, SqliteType = SqliteType.Integer };
 
             parameter.ResetSqliteType();
 
